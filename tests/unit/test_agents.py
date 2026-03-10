@@ -321,8 +321,11 @@ async def test_supervisor_restart_strategy_replaces_agent() -> None:
     await supervisor.start_all()
     # Allow the failing task to complete and the watcher to restart it.
     await asyncio.sleep(0.3)
-    # The supervisor should have replaced the agent entry with a new instance.
+    # The supervisor should have replaced the agent entry with a new instance
+    # that preserves the original subclass.
     new_agent = supervisor._agents["failing"]
     assert new_agent is not agent
-    assert new_agent.state in (AgentState.RUNNING, AgentState.STOPPED)
+    assert isinstance(new_agent, _FailingAgent)
+    # The restarted _FailingAgent will also fail, so it may be in ERROR state.
+    assert new_agent.state in (AgentState.RUNNING, AgentState.STOPPED, AgentState.ERROR)
     await supervisor.stop_all()

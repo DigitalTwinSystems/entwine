@@ -83,7 +83,7 @@ class Supervisor:
                     agent=agent.name,
                     state=agent.state.value,
                 )
-        self._watch_task = asyncio.get_event_loop().create_task(
+        self._watch_task = asyncio.get_running_loop().create_task(
             self._watch_agents(), name="supervisor:watcher"
         )
         log.info("supervisor.all_started", count=len(self._agents))
@@ -129,15 +129,13 @@ class Supervisor:
         while True:
             await asyncio.sleep(0.1)
             for name, agent in list(self._agents.items()):
-                task = agent._task
-                if task is None or not task.done():
+                if not agent.is_task_done:
                     continue
-                if task.cancelled():
+                if agent.is_task_cancelled:
                     log.info("supervisor.task_cancelled", agent=name)
                     continue
-                exc = task.exception()
+                exc = agent.task_exception
                 if exc is None:
-                    # Task finished cleanly.
                     continue
                 log.error(
                     "supervisor.agent_exception",
@@ -158,10 +156,9 @@ class Supervisor:
         )
 
         if strategy == "restart":
-            # Re-use the existing persona; build a fresh agent on the same bus.
-            from entsim.agents.base import BaseAgent as _BA  # local import avoids cycle
-
-            new_agent = _BA(persona=agent.persona, event_bus=agent._event_bus)
+            # Re-use the existing persona and concrete class; build a fresh agent.
+            agent_cls = type(agent)
+            new_agent = agent_cls(persona=agent.persona, event_bus=agent.event_bus)
             new_agent.start()
             self._agents[name] = new_agent
             log.info("supervisor.agent_restarted", agent=name)

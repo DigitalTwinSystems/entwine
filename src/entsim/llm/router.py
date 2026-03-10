@@ -95,6 +95,7 @@ class LLMRouter:
         try:
             cost: float = float(litellm.completion_cost(completion_response=raw))
         except Exception:
+            log.warning("llm_cost_calculation_failed", model_group=group)
             cost = 0.0
 
         choices = getattr(raw, "choices", [])

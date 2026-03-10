@@ -1,5 +1,6 @@
 """entsim configuration package."""
 
+from entsim.agents.models import WorkingHours
 from entsim.config.loader import load_config
 from entsim.config.models import (
     AgentPersona,
@@ -7,9 +8,10 @@ from entsim.config.models import (
     EnterpriseConfig,
     FullConfig,
     SimulationConfig,
-    WorkingHours,
 )
-from entsim.config.settings import AppSettings, LLMSettings, RAGSettings
+from entsim.config.settings import AppSettings
+from entsim.llm.settings import LLMSettings
+from entsim.rag.settings import RAGSettings
 
 __all__ = [
     "AgentPersona",

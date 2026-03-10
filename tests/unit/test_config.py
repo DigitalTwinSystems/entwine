@@ -8,13 +8,13 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from entsim.agents.models import WorkingHours
 from entsim.config.loader import load_config
 from entsim.config.models import (
     AgentPersona,
     EnterpriseConfig,
     FullConfig,
     SimulationConfig,
-    WorkingHours,
 )
 
 # ---------------------------------------------------------------------------

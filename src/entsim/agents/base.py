@@ -36,9 +36,12 @@ class BaseAgent:
         self,
         persona: AgentPersona,
         event_bus: asyncio.Queue[Any],
+        *,
+        tick_interval: float = 0.05,
     ) -> None:
         self._persona = persona
         self._event_bus = event_bus
+        self._tick_interval = tick_interval
 
         self._state: AgentState = AgentState.CREATED
         self._task: asyncio.Task[None] | None = None
@@ -79,6 +82,28 @@ class BaseAgent:
     def state(self) -> AgentState:
         """Return the current lifecycle state."""
         return self._state
+
+    @property
+    def event_bus(self) -> asyncio.Queue[Any]:
+        """Return the agent's event bus queue."""
+        return self._event_bus
+
+    @property
+    def is_task_done(self) -> bool:
+        """Return True if the agent's asyncio Task has completed."""
+        return self._task is not None and self._task.done()
+
+    @property
+    def task_exception(self) -> BaseException | None:
+        """Return the exception from the agent's task, or None."""
+        if self._task is not None and self._task.done() and not self._task.cancelled():
+            return self._task.exception()
+        return None
+
+    @property
+    def is_task_cancelled(self) -> bool:
+        """Return True if the agent's asyncio Task was cancelled."""
+        return self._task is not None and self._task.cancelled()
 
     # ------------------------------------------------------------------
     # Lifecycle control
@@ -144,12 +169,9 @@ class BaseAgent:
                 if self._stop_event.is_set():
                     break
 
-                # 2. Await the next trigger from the event bus (non-blocking
-                #    peek; fall through immediately if nothing is queued).
+                # 2. Await the next trigger from the event bus with timeout.
                 event = await self._next_event()
                 if event is None:
-                    # No event available — yield control and retry.
-                    await asyncio.sleep(0)
                     continue
 
                 # 3. Clear working memory for this tick.
@@ -178,17 +200,15 @@ class BaseAgent:
             log.exception("agent.error", agent=self.name, error=str(exc))
             raise
 
-        self._transition(AgentState.STOPPED)
-
     # ------------------------------------------------------------------
     # Overridable stubs
     # ------------------------------------------------------------------
 
     async def _next_event(self) -> Any | None:
-        """Return the next event from the bus without blocking, or None."""
+        """Return the next event from the bus, waiting up to tick_interval seconds."""
         try:
-            return self._event_bus.get_nowait()
-        except asyncio.QueueEmpty:
+            return await asyncio.wait_for(self._event_bus.get(), timeout=self._tick_interval)
+        except TimeoutError:
             return None
 
     async def _query_rag(self, event: Any) -> list[Any]:

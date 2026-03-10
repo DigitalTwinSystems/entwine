@@ -19,6 +19,7 @@
       "Bash(cat *)",
       "Bash(cd *)",
       "Bash(sed *)",
+      "Bash(ruff *)",
       "WebSearch",
       "WebFetch(*)"
     ]

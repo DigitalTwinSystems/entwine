@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from entsim.agents.models import AgentPersona
+
 
 class SimulationConfig(BaseModel):
     """Top-level simulation parameters."""
@@ -27,27 +29,6 @@ class EnterpriseConfig(BaseModel):
     name: str
     description: str = ""
     departments: list[DepartmentConfig] = Field(default_factory=list)
-
-
-class WorkingHours(BaseModel):
-    """Working hours window for an agent."""
-
-    start: str = Field(default="09:00", pattern=r"^\d{2}:\d{2}$")
-    end: str = Field(default="17:00", pattern=r"^\d{2}:\d{2}$")
-
-
-class AgentPersona(BaseModel):
-    """Persona definition for a single simulated agent."""
-
-    name: str
-    role: str
-    department: str
-    goal: str
-    backstory: str = ""
-    llm_tier: str = Field(default="standard")
-    tools: list[str] = Field(default_factory=list)
-    rag_access: list[str] = Field(default_factory=list)
-    working_hours: WorkingHours = Field(default_factory=WorkingHours)
 
 
 class FullConfig(BaseModel):

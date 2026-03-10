@@ -10,6 +10,7 @@ import structlog
 from entsim.agents.base import BaseAgent
 from entsim.agents.models import AgentPersona
 from entsim.agents.prompts import assemble_messages, build_system_prompt
+from entsim.events.models import Event
 from entsim.llm.models import CompletionResponse, LLMTier
 from entsim.llm.router import LLMRouter
 from entsim.rag.models import SearchResult
@@ -18,6 +19,15 @@ from entsim.tools.dispatcher import ToolDispatcher
 from entsim.tools.models import ToolCall, ToolResult
 
 log = structlog.get_logger(__name__)
+
+# Map config tier names to LLMTier enum values.
+_TIER_MAP: dict[str, LLMTier] = {
+    "routine": LLMTier.ROUTINE,
+    "fast": LLMTier.ROUTINE,
+    "standard": LLMTier.STANDARD,
+    "complex": LLMTier.COMPLEX,
+    "premium": LLMTier.COMPLEX,
+}
 
 
 class StandardAgent(BaseAgent):
@@ -82,16 +92,30 @@ class StandardAgent(BaseAgent):
 
         rag_strings = [r.document.content for r in rag_results if isinstance(r, SearchResult)]
 
+        # Format the event for the LLM context.
+        if isinstance(event, Event):
+            event_text: Any = {
+                "type": event.event_type,
+                "from": event.source_agent,
+                **event.payload,
+            }
+        else:
+            event_text = event
+
         messages = assemble_messages(
             system_prompt=system_prompt,
             short_term_memory=list(self.short_term_memory),
-            current_event=event,
+            current_event=event_text,
             rag_results=rag_strings or None,
         )
 
-        tier = LLMTier(self._persona.llm_tier)
+        tier = _TIER_MAP.get(self._persona.llm_tier, LLMTier.STANDARD)
 
-        response = await self._llm_router.complete(tier=tier, messages=messages)
+        try:
+            response = await self._llm_router.complete(tier=tier, messages=messages)
+        except Exception:
+            log.exception("standard_agent.llm_error", agent=self.name)
+            return None
         log.debug(
             "standard_agent.llm_response",
             agent=self.name,

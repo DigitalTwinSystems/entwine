@@ -13,6 +13,7 @@ from entsim.agents.standard import StandardAgent
 from entsim.agents.supervisor import Supervisor
 from entsim.config.models import FullConfig
 from entsim.events.bus import EventBus
+from entsim.events.models import SystemEvent, TaskAssigned
 from entsim.platforms.registry import PlatformRegistry
 from entsim.platforms.stubs import (
     EmailAdapter,
@@ -188,6 +189,22 @@ class SimulationEngine:
             self._tick_loop(), name="engine:tick_loop"
         )
 
+        # Seed each agent with an initial task so they start working.
+        for agent in self._agents:
+            await self._event_bus.publish(
+                TaskAssigned(
+                    source_agent="simulation",
+                    payload={
+                        "task": (
+                            f"You are starting your workday at {self._config.enterprise.name}. "
+                            f"Review your goals and decide what to work on first. "
+                            f"Think about what actions you should take given your role."
+                        ),
+                        "target_agent": agent.name,
+                    },
+                )
+            )
+
         log.info("engine.started", simulation=self._config.simulation.name)
 
     async def stop(self) -> None:
@@ -282,6 +299,18 @@ class SimulationEngine:
             if not self._clock.is_running:
                 continue
             self._clock.tick()
+
+            # Publish a tick event so agents know time is passing.
+            await self._event_bus.publish(
+                SystemEvent(
+                    source_agent="simulation",
+                    payload={
+                        "tick": self._clock.elapsed_ticks,
+                        "sim_time": self._clock.current_time.isoformat(),
+                    },
+                )
+            )
+
             if max_ticks is not None and self._clock.elapsed_ticks >= max_ticks:
                 log.info("engine.max_ticks_reached", ticks=self._clock.elapsed_ticks)
                 break

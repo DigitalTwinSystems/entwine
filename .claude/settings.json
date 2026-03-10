@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(gh *)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "WebSearch",
+      "WebFetch(*)"
     ]
   }
 }

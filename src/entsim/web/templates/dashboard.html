@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block extra_css %}
+.controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #333;
+    margin-bottom: 1rem;
+}
+.controls button {
+    font-family: inherit;
+    font-size: 0.85rem;
+    padding: 0.4rem 1rem;
+    border: 1px solid #555;
+    border-radius: 4px;
+    background: #16213e;
+    color: #eee;
+    cursor: pointer;
+}
+.controls button:hover { background: #1a3a5c; }
+.controls .sim-info {
+    margin-left: auto;
+    font-size: 0.8rem;
+    color: #aaa;
+}
+.dashboard {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+.section-title {
+    font-size: 0.9rem;
+    color: #aaa;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.agent-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 0.75rem;
+}
+.agent-card {
+    background: #16213e;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+}
+.agent-card .agent-name {
+    font-weight: bold;
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+}
+.agent-card .agent-role {
+    font-size: 0.8rem;
+    color: #aaa;
+}
+.agent-card .agent-dept {
+    font-size: 0.75rem;
+    color: #777;
+    margin-bottom: 0.5rem;
+}
+.agent-card .agent-state {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+}
+.state-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+.state-RUNNING .state-dot  { background: #4caf50; }
+.state-READY .state-dot    { background: #4caf50; }
+.state-PAUSED .state-dot   { background: #ffc107; }
+.state-ERROR .state-dot    { background: #f44336; }
+.state-STOPPED .state-dot  { background: gray; }
+.state-CREATED .state-dot  { background: #2196f3; }
+.agent-card .agent-timestamp {
+    font-size: 0.7rem;
+    color: #666;
+    margin-top: 0.4rem;
+}
+.event-log {
+    background: #0f0f23;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 0.75rem;
+    height: 500px;
+    overflow-y: auto;
+    font-size: 0.8rem;
+    line-height: 1.6;
+}
+.event-log .event-entry {
+    padding: 0.2rem 0;
+    border-bottom: 1px solid #1a1a2e;
+}
+.event-log .event-type {
+    color: #e94560;
+    font-weight: bold;
+}
+.event-log .event-source {
+    color: #4caf50;
+}
+.event-log .event-time {
+    color: #666;
+}
+@media (max-width: 900px) {
+    .dashboard { grid-template-columns: 1fr; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="controls">
+    <button hx-post="/simulation/start" hx-swap="none">Start</button>
+    <button hx-post="/simulation/pause" hx-swap="none">Pause</button>
+    <button hx-post="/simulation/stop" hx-swap="none">Stop</button>
+    <div class="sim-info">
+        Ticks: <span id="tick-count">0</span> |
+        Time: <span id="sim-time">00:00:00</span>
+    </div>
+</div>
+
+<div class="dashboard" hx-ext="sse" sse-connect="/events">
+    <div>
+        <div class="section-title">Agents</div>
+        <div id="agent-cards" class="agent-grid" sse-swap="agent_state_change" hx-swap="innerHTML">
+            {% for agent in agents %}
+            <div class="agent-card">
+                <div class="agent-name">{{ agent.name }}</div>
+                <div class="agent-role">{{ agent.role }}</div>
+                <div class="agent-dept">{{ agent.department }}</div>
+                <div class="agent-state state-{{ agent.state }}">
+                    <span class="state-dot"></span>
+                    {{ agent.state }}
+                </div>
+                <div class="agent-timestamp">—</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div>
+        <div class="section-title">Live Events</div>
+        <div id="event-log" class="event-log" sse-swap="message" hx-swap="afterbegin">
+            <div class="event-entry" style="color: #666;">Waiting for events...</div>
+        </div>
+    </div>
+</div>
+{% endblock %}

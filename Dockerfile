@@ -23,8 +23,8 @@ COPY src/ ./src/
 COPY pyproject.toml ./
 
 # Non-root user
-RUN useradd -m entsim && chown -R entsim /app
-USER entsim
+RUN useradd -m entwine && chown -R entwine /app
+USER entwine
 
 # Put venv on PATH so uv and python resolve correctly
 ENV PATH="/app/.venv/bin:$PATH"
@@ -34,4 +34,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" || exit 1
 
-CMD ["uvicorn", "entsim.web.app:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "entwine.web.app:app", "--host", "0.0.0.0", "--port", "8000"]

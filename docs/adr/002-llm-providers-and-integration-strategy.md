@@ -2,11 +2,11 @@
 
 **Status:** Accepted
 **Date:** 2026-03-10
-**Issue:** [#2](https://github.com/DigitalTwinSystems/entsim/issues/2)
+**Issue:** [#2](https://github.com/DigitalTwinSystems/entwine/issues/2)
 
 ## Context
 
-entsim runs ~12 concurrent LLM agents simulating SME operations. We need to select LLM providers, define an integration architecture, and establish a cost-effective model tiering strategy.
+entwine runs ~12 concurrent LLM agents simulating SME operations. We need to select LLM providers, define an integration architecture, and establish a cost-effective model tiering strategy.
 
 The workload characteristics: I/O-bound (LLM API latency dominates), moderate concurrency (12 agents), mixed complexity (routine tasks + complex reasoning), and shared context across agents (org structure, simulation rules).
 

@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from entsim.llm.models import CompletionRequest, CompletionResponse, LLMTier
-from entsim.llm.router import LLMRouter
-from entsim.llm.settings import LLMSettings
+from entwine.llm.models import CompletionRequest, CompletionResponse, LLMTier
+from entwine.llm.router import LLMRouter
+from entwine.llm.settings import LLMSettings
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -74,8 +74,8 @@ class TestLLMSettings:
         assert settings.complex_model == "openai/gpt-test-complex"
 
     def test_env_var_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """ENTSIM_LLM_* env vars should override defaults."""
-        monkeypatch.setenv("ENTSIM_LLM_ROUTINE_MODEL", "openai/env-routine")
+        """ENTWINE_LLM_* env vars should override defaults."""
+        monkeypatch.setenv("ENTWINE_LLM_ROUTINE_MODEL", "openai/env-routine")
         settings = LLMSettings()
         assert settings.routine_model == "openai/env-routine"
 
@@ -86,7 +86,7 @@ class TestLLMSettings:
 
 
 class TestLLMRouterInit:
-    @patch("entsim.llm.router.Router")
+    @patch("entwine.llm.router.Router")
     def test_router_initialised_with_three_model_groups(self, mock_router_cls: MagicMock) -> None:
         """Router constructor should receive exactly three model-list entries."""
         settings = make_settings()
@@ -97,7 +97,7 @@ class TestLLMRouterInit:
         model_list: list[dict[str, Any]] = call_kwargs["model_list"]
         assert len(model_list) == 3
 
-    @patch("entsim.llm.router.Router")
+    @patch("entwine.llm.router.Router")
     def test_model_list_entries_use_settings_values(self, mock_router_cls: MagicMock) -> None:
         """Each model-list entry should use the model name from settings."""
         settings = make_settings()
@@ -111,13 +111,13 @@ class TestLLMRouterInit:
         assert by_name["standard"]["litellm_params"]["model"] == settings.standard_model
         assert by_name["complex"]["litellm_params"]["model"] == settings.complex_model
 
-    @patch("entsim.llm.router.Router")
+    @patch("entwine.llm.router.Router")
     def test_default_settings_used_when_none_provided(self, mock_router_cls: MagicMock) -> None:
         """LLMRouter should create its own LLMSettings when none is passed."""
         LLMRouter()
         mock_router_cls.assert_called_once()
 
-    @patch("entsim.llm.router.Router")
+    @patch("entwine.llm.router.Router")
     def test_settings_property_returns_settings(self, _mock_router_cls: MagicMock) -> None:
         settings = make_settings()
         router = LLMRouter(settings=settings)
@@ -130,19 +130,19 @@ class TestLLMRouterInit:
 
 
 class TestTierModelMapping:
-    @patch("entsim.llm.router.Router")
+    @patch("entwine.llm.router.Router")
     def test_tier_model_name_routine(self, _mock_router_cls: MagicMock) -> None:
         settings = make_settings()
         router = LLMRouter(settings=settings)
         assert router.tier_model_name(LLMTier.ROUTINE) == settings.routine_model
 
-    @patch("entsim.llm.router.Router")
+    @patch("entwine.llm.router.Router")
     def test_tier_model_name_standard(self, _mock_router_cls: MagicMock) -> None:
         settings = make_settings()
         router = LLMRouter(settings=settings)
         assert router.tier_model_name(LLMTier.STANDARD) == settings.standard_model
 
-    @patch("entsim.llm.router.Router")
+    @patch("entwine.llm.router.Router")
     def test_tier_model_name_complex(self, _mock_router_cls: MagicMock) -> None:
         settings = make_settings()
         router = LLMRouter(settings=settings)
@@ -160,7 +160,7 @@ class TestLLMRouterComplete:
     def _make_router(self) -> tuple[LLMRouter, MagicMock]:
         """Return (router, mock_inner_router) with acompletion stubbed out."""
         settings = make_settings()
-        with patch("entsim.llm.router.Router") as mock_router_cls:
+        with patch("entwine.llm.router.Router") as mock_router_cls:
             mock_inner = MagicMock()
             mock_router_cls.return_value = mock_inner
             router = LLMRouter(settings=settings)
@@ -172,7 +172,7 @@ class TestLLMRouterComplete:
         mock_response = make_mock_response(model="openai/gpt-test-routine")
         mock_inner.acompletion = AsyncMock(return_value=mock_response)
 
-        with patch("entsim.llm.router.litellm.completion_cost", return_value=0.001):
+        with patch("entwine.llm.router.litellm.completion_cost", return_value=0.001):
             await router.complete(LLMTier.ROUTINE, [{"role": "user", "content": "hi"}])
 
         mock_inner.acompletion.assert_awaited_once()
@@ -185,7 +185,7 @@ class TestLLMRouterComplete:
         mock_response = make_mock_response(model="openai/gpt-test-standard")
         mock_inner.acompletion = AsyncMock(return_value=mock_response)
 
-        with patch("entsim.llm.router.litellm.completion_cost", return_value=0.002):
+        with patch("entwine.llm.router.litellm.completion_cost", return_value=0.002):
             await router.complete(LLMTier.STANDARD, [{"role": "user", "content": "hi"}])
 
         call_kwargs = mock_inner.acompletion.call_args.kwargs
@@ -197,7 +197,7 @@ class TestLLMRouterComplete:
         mock_response = make_mock_response(model="openai/gpt-test-complex")
         mock_inner.acompletion = AsyncMock(return_value=mock_response)
 
-        with patch("entsim.llm.router.litellm.completion_cost", return_value=0.005):
+        with patch("entwine.llm.router.litellm.completion_cost", return_value=0.005):
             await router.complete(LLMTier.COMPLEX, [{"role": "user", "content": "hi"}])
 
         call_kwargs = mock_inner.acompletion.call_args.kwargs
@@ -214,7 +214,7 @@ class TestLLMRouterComplete:
         )
         mock_inner.acompletion = AsyncMock(return_value=mock_response)
 
-        with patch("entsim.llm.router.litellm.completion_cost", return_value=0.003):
+        with patch("entwine.llm.router.litellm.completion_cost", return_value=0.003):
             result = await router.complete(LLMTier.STANDARD, [{"role": "user", "content": "hi"}])
 
         assert isinstance(result, CompletionResponse)
@@ -231,7 +231,7 @@ class TestLLMRouterComplete:
         mock_inner.acompletion = AsyncMock(return_value=mock_response)
 
         tools = [{"type": "function", "function": {"name": "my_tool", "parameters": {}}}]
-        with patch("entsim.llm.router.litellm.completion_cost", return_value=0.001):
+        with patch("entwine.llm.router.litellm.completion_cost", return_value=0.001):
             await router.complete(
                 LLMTier.STANDARD, [{"role": "user", "content": "hi"}], tools=tools
             )
@@ -245,7 +245,7 @@ class TestLLMRouterComplete:
         mock_response = make_mock_response()
         mock_inner.acompletion = AsyncMock(return_value=mock_response)
 
-        with patch("entsim.llm.router.litellm.completion_cost", return_value=0.001):
+        with patch("entwine.llm.router.litellm.completion_cost", return_value=0.001):
             await router.complete(LLMTier.STANDARD, [{"role": "user", "content": "hi"}])
 
         call_kwargs = mock_inner.acompletion.call_args.kwargs
@@ -259,7 +259,7 @@ class TestLLMRouterComplete:
         mock_inner.acompletion = AsyncMock(return_value=mock_response)
 
         with patch(
-            "entsim.llm.router.litellm.completion_cost",
+            "entwine.llm.router.litellm.completion_cost",
             side_effect=Exception("cost error"),
         ):
             result = await router.complete(LLMTier.ROUTINE, [{"role": "user", "content": "hi"}])
@@ -309,7 +309,7 @@ class TestCompleteRequest:
 
     def _make_router(self) -> tuple[LLMRouter, MagicMock]:
         settings = make_settings()
-        with patch("entsim.llm.router.Router") as mock_router_cls:
+        with patch("entwine.llm.router.Router") as mock_router_cls:
             mock_inner = MagicMock()
             mock_router_cls.return_value = mock_inner
             router = LLMRouter(settings=settings)
@@ -326,7 +326,7 @@ class TestCompleteRequest:
             messages=[{"role": "user", "content": "hello"}],
         )
 
-        with patch("entsim.llm.router.litellm.completion_cost", return_value=0.001):
+        with patch("entwine.llm.router.litellm.completion_cost", return_value=0.001):
             result = await router.complete_request(request)
 
         assert isinstance(result, CompletionResponse)
@@ -348,7 +348,7 @@ class TestCompleteRequest:
             tools=tools,
         )
 
-        with patch("entsim.llm.router.litellm.completion_cost", return_value=0.001):
+        with patch("entwine.llm.router.litellm.completion_cost", return_value=0.001):
             await router.complete_request(request)
 
         call_kwargs = mock_inner.acompletion.call_args.kwargs
@@ -363,7 +363,7 @@ class TestCompleteRequest:
 class TestCompleteEdgeCases:
     def _make_router(self) -> tuple[LLMRouter, MagicMock]:
         settings = make_settings()
-        with patch("entsim.llm.router.Router") as mock_router_cls:
+        with patch("entwine.llm.router.Router") as mock_router_cls:
             mock_inner = MagicMock()
             mock_router_cls.return_value = mock_inner
             router = LLMRouter(settings=settings)
@@ -379,7 +379,7 @@ class TestCompleteEdgeCases:
         response.choices = []
         mock_inner.acompletion = AsyncMock(return_value=response)
 
-        with patch("entsim.llm.router.litellm.completion_cost", return_value=0.0):
+        with patch("entwine.llm.router.litellm.completion_cost", return_value=0.0):
             result = await router.complete(LLMTier.STANDARD, [{"role": "user", "content": "x"}])
 
         assert result.input_tokens == 0

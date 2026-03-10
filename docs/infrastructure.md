@@ -1,4 +1,4 @@
-# entsim Infrastructure Specification
+# entwine Infrastructure Specification
 
 **Last updated:** 2026-03-10
 **Authoritative ADR:** [ADR-007](adr/007-deployment-and-infrastructure.md)
@@ -20,11 +20,11 @@
 ### First-time setup
 
 ```bash
-git clone https://github.com/DigitalTwinSystems/entsim.git
-cd entsim
+git clone https://github.com/DigitalTwinSystems/entwine.git
+cd entwine
 cp .env.example .env          # fill in API keys (see §5)
 uv run pre-commit install
-docker compose up             # starts entsim + qdrant + ollama
+docker compose up             # starts entwine + qdrant + ollama
 ```
 
 The app is available at `http://localhost:8000`. Qdrant UI at `http://localhost:6333/dashboard`.
@@ -34,7 +34,7 @@ The app is available at `http://localhost:8000`. Qdrant UI at `http://localhost:
 | Command | Purpose |
 |---------|---------|
 | `docker compose up` | Start all services (auto-applies `compose.override.yaml`) |
-| `docker compose up --build entsim` | Rebuild the app container |
+| `docker compose up --build entwine` | Rebuild the app container |
 | `uv run pytest` | Run unit tests |
 | `uv run ruff check src/` | Lint |
 | `uv run mypy src/` | Type-check |
@@ -55,9 +55,9 @@ Three-file layered strategy ([merge semantics](https://docs.docker.com/compose/h
 
 ```yaml
 services:
-  entsim:
+  entwine:
     build: .
-    image: ghcr.io/digitaltwinsystems/entsim:latest
+    image: ghcr.io/digitaltwinsystems/entwine:latest
     restart: unless-stopped
     env_file: .env
     environment:
@@ -69,7 +69,7 @@ services:
       qdrant:
         condition: service_healthy
     networks:
-      - entsim-net
+      - entwine-net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -84,7 +84,7 @@ services:
     ports:
       - "6333:6333"
     networks:
-      - entsim-net
+      - entwine-net
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:6333/readyz"]
       interval: 10s
@@ -92,7 +92,7 @@ services:
       retries: 5
 
 networks:
-  entsim-net:
+  entwine-net:
     driver: bridge
 
 volumes:
@@ -103,7 +103,7 @@ volumes:
 
 ```yaml
 services:
-  entsim:
+  entwine:
     build:
       context: .
       target: dev
@@ -121,7 +121,7 @@ services:
     ports:
       - "11434:11434"
     networks:
-      - entsim-net
+      - entwine-net
 
   jaeger:
     image: jaegertracing/all-in-one:latest
@@ -129,7 +129,7 @@ services:
       - "16686:16686"   # Jaeger UI
       - "4317:4317"     # OTLP gRPC
     networks:
-      - entsim-net
+      - entwine-net
 
 volumes:
   ollama-data:
@@ -139,8 +139,8 @@ volumes:
 
 ```yaml
 services:
-  entsim:
-    image: ghcr.io/digitaltwinsystems/entsim:${IMAGE_TAG:-latest}
+  entwine:
+    image: ghcr.io/digitaltwinsystems/entwine:${IMAGE_TAG:-latest}
     build: !reset null            # never build in prod
     deploy:
       resources:
@@ -164,7 +164,7 @@ services:
 
 | Service | Host port | Container port | Purpose |
 |---------|-----------|----------------|---------|
-| entsim | 8000 | 8000 | FastAPI + HTMX UI |
+| entwine | 8000 | 8000 | FastAPI + HTMX UI |
 | qdrant | 6333 | 6333 | Vector store HTTP / gRPC |
 | ollama | 11434 | 11434 | Local LLM (dev only) |
 | jaeger | 16686 | 16686 | Trace UI (dev only) |
@@ -196,15 +196,15 @@ RUN uv sync --no-dev --frozen
 COPY src/ ./src/
 
 # Non-root user
-RUN useradd -m entsim && chown -R entsim /app
-USER entsim
+RUN useradd -m entwine && chown -R entwine /app
+USER entwine
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-CMD ["uv", "run", "entsim", "serve"]
+CMD ["uv", "run", "entwine", "serve"]
 ```
 
 ### Build notes
@@ -217,7 +217,7 @@ CMD ["uv", "run", "entsim", "serve"]
 
 ```
 src/
-└── entsim/
+└── entwine/
     ├── __init__.py
     ├── agents/        # asyncio agent coroutines, supervisor
     ├── config/        # Pydantic Settings, TOML/YAML loaders
@@ -249,8 +249,8 @@ curl -fsSL https://get.docker.com | sh
 usermod -aG docker $USER
 
 # Clone repo and configure
-git clone https://github.com/DigitalTwinSystems/entsim.git /opt/entsim
-cd /opt/entsim
+git clone https://github.com/DigitalTwinSystems/entwine.git /opt/entwine
+cd /opt/entwine
 cp .env.example .env    # fill prod secrets
 
 # Start production stack
@@ -273,7 +273,7 @@ sudo apt update && sudo apt install caddy
 **`/etc/caddy/Caddyfile`:**
 
 ```caddyfile
-entsim.example.com {
+entwine.example.com {
     reverse_proxy localhost:8000
 
     # Cache static assets
@@ -305,7 +305,7 @@ sudo systemctl enable --now caddy
 ### Production deployment command (used by `deploy.yml`)
 
 ```bash
-cd /opt/entsim
+cd /opt/entwine
 git pull origin main
 IMAGE_TAG=${GITHUB_SHA::8} docker compose -f compose.yaml -f compose.prod.yaml pull
 IMAGE_TAG=${GITHUB_SHA::8} docker compose -f compose.yaml -f compose.prod.yaml up -d
@@ -356,7 +356,7 @@ QDRANT_API_KEY=
 E2B_API_KEY=
 
 # ── Observability ──
-OTEL_SERVICE_NAME=entsim
+OTEL_SERVICE_NAME=entwine
 OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
 
 # ── App settings ──
@@ -373,7 +373,7 @@ Settings are loaded via [Pydantic Settings](https://docs.pydantic.dev/latest/con
 4. Pydantic field defaults
 
 ```python
-# src/entsim/config/settings.py
+# src/entwine/config/settings.py
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -427,7 +427,7 @@ log.info("agent.llm_call", agent_id=agent.id, model=tier, tokens=usage.total_tok
          cost_usd=cost, duration_ms=elapsed)
 ```
 
-JSON output goes to stdout; Docker captures it via the default `json-file` log driver. Tail with `docker compose logs -f entsim`.
+JSON output goes to stdout; Docker captures it via the default `json-file` log driver. Tail with `docker compose logs -f entwine`.
 
 ### OpenTelemetry setup
 
@@ -437,7 +437,7 @@ opentelemetry-bootstrap -a install   # auto-installs instrumentation packages
 ```
 
 ```python
-# src/entsim/web/app.py — instrument at startup
+# src/entwine/web/app.py — instrument at startup
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -465,9 +465,9 @@ Scrape config for a self-hosted Prometheus instance:
 ```yaml
 # prometheus.yml
 scrape_configs:
-  - job_name: entsim
+  - job_name: entwine
     static_configs:
-      - targets: ["entsim:8000"]
+      - targets: ["entwine:8000"]
     metrics_path: /metrics
     scrape_interval: 15s
 ```
@@ -521,7 +521,7 @@ jobs:
         run: uv run mypy src/
 
       - name: Unit tests
-        run: uv run pytest -m "not integration" --cov=src/entsim --cov-fail-under=80
+        run: uv run pytest -m "not integration" --cov=src/entwine --cov-fail-under=80
 ```
 
 ### `build.yml` — build and push Docker image (push to `main`)
@@ -559,9 +559,9 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/digitaltwinsystems/entsim:latest
-            ghcr.io/digitaltwinsystems/entsim:${{ github.sha }}
-          cache-from: type=registry,ref=ghcr.io/digitaltwinsystems/entsim:latest
+            ghcr.io/digitaltwinsystems/entwine:latest
+            ghcr.io/digitaltwinsystems/entwine:${{ github.sha }}
+          cache-from: type=registry,ref=ghcr.io/digitaltwinsystems/entwine:latest
           cache-to: type=inline
 ```
 
@@ -592,7 +592,7 @@ jobs:
           username: ${{ secrets.PROD_USER }}
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
-            cd /opt/entsim
+            cd /opt/entwine
             git pull origin main
             IMAGE_TAG=${{ inputs.image_tag || github.sha }} \
               docker compose -f compose.yaml -f compose.prod.yaml pull
@@ -618,19 +618,19 @@ jobs:
 
 ### Service discovery
 
-All services communicate over the `entsim-net` Docker bridge network using service names as hostnames:
+All services communicate over the `entwine-net` Docker bridge network using service names as hostnames:
 
 ```
-entsim  →  qdrant:6333     (vector store)
-entsim  →  ollama:11434    (local LLM, dev only)
-entsim  →  jaeger:4317     (OTLP traces, dev only)
+entwine  →  qdrant:6333     (vector store)
+entwine  →  ollama:11434    (local LLM, dev only)
+entwine  →  jaeger:4317     (OTLP traces, dev only)
 ```
 
 In production, `ollama` and `jaeger` are absent. Traces go to an external OTLP endpoint via `OTEL_EXPORTER_OTLP_ENDPOINT`.
 
 ### External API connectivity
 
-The `entsim` container needs outbound HTTPS (port 443) to:
+The `entwine` container needs outbound HTTPS (port 443) to:
 
 | Endpoint | Purpose | ADR |
 |----------|---------|-----|
@@ -650,8 +650,8 @@ No inbound ports beyond 8000 (proxied by Caddy on 443) are required.
 
 | Port | Protocol | Direction | Service | Environment |
 |------|----------|-----------|---------|-------------|
-| 443 | HTTPS | Inbound | Caddy → entsim:8000 | Prod |
-| 8000 | HTTP | Inbound | entsim FastAPI | Dev (direct) |
+| 443 | HTTPS | Inbound | Caddy → entwine:8000 | Prod |
+| 8000 | HTTP | Inbound | entwine FastAPI | Dev (direct) |
 | 6333 | HTTP/gRPC | Internal | Qdrant | Both |
 | 11434 | HTTP | Internal | Ollama | Dev only |
 | 16686 | HTTP | Inbound | Jaeger UI | Dev only |

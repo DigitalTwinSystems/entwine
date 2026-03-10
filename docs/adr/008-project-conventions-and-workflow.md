@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-03-10
-**Issue:** [#8](https://github.com/DigitalTwinSystems/entsim/issues/8)
+**Issue:** [#8](https://github.com/DigitalTwinSystems/entwine/issues/8)
 
 ## Context
 
@@ -15,12 +15,12 @@ ADR-001 established Python 3.12+, uv, ruff, and mypy/pyright as tooling choices.
 Src layout with a single top-level package:
 
 ```
-entsim/
+entwine/
 ├── pyproject.toml
 ├── uv.lock
 ├── .python-version
 ├── src/
-│   └── entsim/
+│   └── entwine/
 │       ├── __init__.py
 │       ├── agents/
 │       ├── config/
@@ -89,18 +89,18 @@ indent-style = "space"
 |------|--------|
 | Framework | pytest |
 | Coverage | pytest-cov (coverage.py backend) |
-| Coverage target | 80% overall; 90% for `src/entsim/agents/` and `src/entsim/rag/` |
+| Coverage target | 80% overall; 90% for `src/entwine/agents/` and `src/entwine/rag/` |
 | Async tests | pytest-anyio |
 | Mocking | pytest built-in `monkeypatch` + `unittest.mock` |
-| Test layout | `tests/unit/` mirrors `src/entsim/`; `tests/integration/` for external calls |
+| Test layout | `tests/unit/` mirrors `src/entwine/`; `tests/integration/` for external calls |
 
 ```toml
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=src/entsim --cov-report=term-missing --cov-fail-under=80"
+addopts = "--cov=src/entwine --cov-report=term-missing --cov-fail-under=80"
 
 [tool.coverage.run]
-source = ["src/entsim"]
+source = ["src/entwine"]
 omit = ["tests/*"]
 ```
 

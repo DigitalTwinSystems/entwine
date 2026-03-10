@@ -2,11 +2,11 @@
 
 **Status:** Accepted
 **Date:** 2026-03-10
-**Issue:** [#10](https://github.com/DigitalTwinSystems/entsim/issues/10)
+**Issue:** [#10](https://github.com/DigitalTwinSystems/entwine/issues/10)
 
 ## Context
 
-entsim simulates SME operations using ~12 concurrent LLM agents. Issue #10 asks whether those agents can include software developers ("coders") and, if so, how to make their work realistic by integrating with agentic coding tools.
+entwine simulates SME operations using ~12 concurrent LLM agents. Issue #10 asks whether those agents can include software developers ("coders") and, if so, how to make their work realistic by integrating with agentic coding tools.
 
 Existing decisions constrain the solution space:
 - **ADR-001:** Python 3.12+, asyncio, FastAPI
@@ -18,20 +18,20 @@ A coder agent must be able to write code, run tests, commit to git, and particip
 
 ## Decision
 
-**Yes, entsim supports coder agent roles.** The integration model is:
+**Yes, entwine supports coder agent roles.** The integration model is:
 
 1. **Primary tool:** Claude Agent SDK (`claude-agent-sdk`) — wraps the coder agent's work loop natively in Python/asyncio.
 2. **Sandboxed execution:** E2B microVM sandboxes for `Bash` tool calls that execute untrusted code.
 3. **Real Git repositories**, accessed inside the sandbox, for authentic commit/PR workflows.
-4. **Cross-role communication** via the existing entsim agent bus — a product-manager agent assigns tasks; a QA agent reviews output.
+4. **Cross-role communication** via the existing entwine agent bus — a product-manager agent assigns tasks; a QA agent reviews output.
 
 | Concern | Choice |
 |---------|--------|
 | Coding tool / agent loop | [Claude Agent SDK](https://platform.claude.com/docs/en/agent-sdk/overview) (`pip install claude-agent-sdk`) |
 | Code-execution sandbox | [E2B](https://e2b.dev/) microVM (`pip install e2b`) |
 | Repository model | Real Git repo, cloned inside E2B sandbox |
-| CI/CD interaction | Simulated: coder agent pushes branch; entsim stub returns fake CI result |
-| Code review workflow | PR description posted to entsim agent bus; QA/peer agent reviews via read-only tools |
+| CI/CD interaction | Simulated: coder agent pushes branch; entwine stub returns fake CI result |
+| Code review workflow | PR description posted to entwine agent bus; QA/peer agent reviews via read-only tools |
 | LLM tier for coder | Tier 2 (Claude Sonnet 4.6) by default; Tier 3 (Opus 4.6) for complex planning |
 
 ## Rationale
@@ -49,7 +49,7 @@ A coder agent must be able to write code, run tests, commit to git, and particip
 
 **Why Claude Agent SDK wins:**
 
-- Fits the existing asyncio architecture with zero friction — `async for message in query(...)` drops directly into entsim's agent coroutines.
+- Fits the existing asyncio architecture with zero friction — `async for message in query(...)` drops directly into entwine's agent coroutines.
 - Built-in tool set covers everything a coder needs: `Read`, `Write`, `Edit`, `Bash`, `Glob`, `Grep`, plus `WebSearch`/`WebFetch` for researching APIs.
 - `ClaudeAgentOptions(allowed_tools=[...])` gives fine-grained tool gating — trivial to deny `Bash` in production or restrict to read-only for code-review agents.
 - Hooks (`PreToolUse`, `PostToolUse`) enable audit logging of every file change and command.
@@ -108,17 +108,17 @@ options = ClaudeAgentOptions(
 - A real Git repository (private GitHub repo per simulated enterprise) is cloned into the E2B sandbox at session start.
 - The coder agent pushes branches and opens PRs through the GitHub API (or `gh` CLI inside the sandbox).
 - This produces authentic git history, real diffs, and reviewable PRs — observable by QA/peer agents.
-- CI/CD is simulated: entsim runs a stub that responds to webhook events with synthetic pass/fail results, avoiding the cost and complexity of real CI pipelines.
+- CI/CD is simulated: entwine runs a stub that responds to webhook events with synthetic pass/fail results, avoiding the cost and complexity of real CI pipelines.
 
 ### Cross-role collaboration
 
 | Workflow | Implementation |
 |----------|---------------|
-| PM assigns task | PM agent posts a `TaskAssigned` event to the entsim agent bus; coder agent subscribes and initiates an Agent SDK session |
+| PM assigns task | PM agent posts a `TaskAssigned` event to the entwine agent bus; coder agent subscribes and initiates an Agent SDK session |
 | Coder opens PR | Coder agent calls GitHub API from inside sandbox; posts `PROpened` event to bus with PR URL |
 | QA reviews | QA agent runs a read-only Claude Agent SDK session (`allowed_tools=["Read","Glob","Grep"]`) against the diff |
 | Code review by peer | Second coder agent spawned as subagent with read-only tools; posts review comments to GitHub |
-| CI result | entsim stub posts `CIResult` event; coder agent may resume session to fix failures |
+| CI result | entwine stub posts `CIResult` event; coder agent may resume session to fix failures |
 
 All events flow through the existing asyncio event bus — no new IPC mechanism required.
 
@@ -145,13 +145,13 @@ Mitigations:
 | AI-generated code escapes sandbox | E2B Firecracker VM; no shared kernel with host |
 | Sandbox exfiltrates secrets | E2B sandbox has no access to host env vars; secrets injected explicitly and scoped |
 | Coder agent commits malicious code | Simulated repo is isolated; real org repos are never connected |
-| Runaway sandbox costs | E2B session timeout (configurable); entsim kills sandbox after task deadline |
+| Runaway sandbox costs | E2B session timeout (configurable); entwine kills sandbox after task deadline |
 | Prompt injection via repo content | `Bash` restricted to sandbox; `allowed_tools` excludes network tools by default |
 
 ### Configuration
 
 ```yaml
-# entsim org config (YAML, per ADR-004)
+# entwine org config (YAML, per ADR-004)
 roles:
   - id: coder_alice
     type: coder
@@ -179,7 +179,7 @@ roles:
 - E2B is a SaaS dependency; offline/air-gapped operation requires switching to self-hosted Firecracker or Docker.
 - Each session clones a git repo into a fresh sandbox — adds latency (~5–30 s depending on repo size) and E2B compute cost.
 - Claude Agent SDK is Anthropic-specific; switching LLM providers for coder agents requires evaluating alternative agent loops (OpenHands REST API is the nearest drop-in).
-- Simulated CI/CD is not a substitute for real CI; entsim will not catch actual build breakage in the simulated codebase.
+- Simulated CI/CD is not a substitute for real CI; entwine will not catch actual build breakage in the simulated codebase.
 
 ### Future options
 

@@ -8,10 +8,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pydantic import ValidationError
 
-from entsim.rag.embeddings import EmbeddingService
-from entsim.rag.models import Document, SearchResult
-from entsim.rag.settings import RAGSettings
-from entsim.rag.store import KnowledgeStore
+from entwine.rag.embeddings import EmbeddingService
+from entwine.rag.models import Document, SearchResult
+from entwine.rag.settings import RAGSettings
+from entwine.rag.store import KnowledgeStore
 
 # ---------------------------------------------------------------------------
 # Document model

@@ -1,5 +1,5 @@
 services:
-  entsim:
+  entwine:
     volumes:
       - ./src:/app/src
     command:
@@ -7,7 +7,7 @@ services:
         "uv",
         "run",
         "uvicorn",
-        "entsim.web.app:app",
+        "entwine.web.app:app",
         "--host",
         "0.0.0.0",
         "--port",
@@ -23,7 +23,7 @@ services:
     ports:
       - "11434:11434"
     networks:
-      - entsim-net
+      - entwine-net
 
 volumes:
   ollama-data:

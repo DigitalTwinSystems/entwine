@@ -7,15 +7,15 @@ from typing import Any
 
 import pytest
 
-from entsim.agents.models import AgentPersona, AgentState, WorkingHours
-from entsim.agents.standard import StandardAgent
-from entsim.events.bus import EventBus
-from entsim.events.models import TaskAssigned
-from entsim.llm.models import CompletionResponse, LLMTier
-from entsim.platforms.registry import PlatformRegistry
-from entsim.platforms.stubs import SlackAdapter, XAdapter
-from entsim.simulation.clock import SimulationClock
-from entsim.tools.dispatcher import ToolDispatcher
+from entwine.agents.models import AgentPersona, AgentState, WorkingHours
+from entwine.agents.standard import StandardAgent
+from entwine.events.bus import EventBus
+from entwine.events.models import TaskAssigned
+from entwine.llm.models import CompletionResponse, LLMTier
+from entwine.platforms.registry import PlatformRegistry
+from entwine.platforms.stubs import SlackAdapter, XAdapter
+from entwine.simulation.clock import SimulationClock
+from entwine.tools.dispatcher import ToolDispatcher
 
 # ---------------------------------------------------------------------------
 # Helpers / fakes
@@ -275,7 +275,7 @@ async def test_platform_adapter_integration() -> None:
         )
 
     # Dispatch through the tool system.
-    from entsim.tools.models import ToolCall
+    from entwine.tools.models import ToolCall
 
     result = await dispatcher.dispatch(
         ToolCall(

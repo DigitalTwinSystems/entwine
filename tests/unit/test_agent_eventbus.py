@@ -7,10 +7,10 @@ from typing import Any
 
 import pytest
 
-from entsim.agents.base import BaseAgent
-from entsim.agents.models import AgentPersona, AgentState
-from entsim.events.bus import EventBus
-from entsim.events.models import Event, TaskAssigned, TaskCompleted
+from entwine.agents.base import BaseAgent
+from entwine.agents.models import AgentPersona, AgentState
+from entwine.events.bus import EventBus
+from entwine.events.models import Event, TaskAssigned, TaskCompleted
 
 # ---------------------------------------------------------------------------
 # Helpers

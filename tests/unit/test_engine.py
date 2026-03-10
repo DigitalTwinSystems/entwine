@@ -7,10 +7,10 @@ from typing import Any
 
 import pytest
 
-from entsim.agents.models import AgentPersona, AgentState
-from entsim.agents.standard import StandardAgent
-from entsim.config.models import EnterpriseConfig, FullConfig, SimulationConfig
-from entsim.simulation.engine import SimulationEngine
+from entwine.agents.models import AgentPersona, AgentState
+from entwine.agents.standard import StandardAgent
+from entwine.config.models import EnterpriseConfig, FullConfig, SimulationConfig
+from entwine.simulation.engine import SimulationEngine
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -207,19 +207,19 @@ class TestWorldState:
 
 class TestIsCoderPersona:
     def test_returns_true_for_coder_tools(self) -> None:
-        from entsim.simulation.engine import _is_coder_persona
+        from entwine.simulation.engine import _is_coder_persona
 
         p = _persona(name="dev", tools=["create_pr", "read_metrics"])
         assert _is_coder_persona(p) is True
 
     def test_returns_false_for_non_coder_tools(self) -> None:
-        from entsim.simulation.engine import _is_coder_persona
+        from entwine.simulation.engine import _is_coder_persona
 
         p = _persona(name="pm", tools=["read_metrics", "draft_email"])
         assert _is_coder_persona(p) is False
 
     def test_returns_false_for_empty_tools(self) -> None:
-        from entsim.simulation.engine import _is_coder_persona
+        from entwine.simulation.engine import _is_coder_persona
 
         p = _persona(name="nobody", tools=[])
         assert _is_coder_persona(p) is False

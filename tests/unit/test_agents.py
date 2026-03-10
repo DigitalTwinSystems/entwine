@@ -8,9 +8,9 @@ from typing import Any
 
 import pytest
 
-from entsim.agents.base import BaseAgent
-from entsim.agents.models import AgentPersona, AgentState
-from entsim.agents.supervisor import Supervisor
+from entwine.agents.base import BaseAgent
+from entwine.agents.models import AgentPersona, AgentState
+from entwine.agents.supervisor import Supervisor
 
 # ---------------------------------------------------------------------------
 # Helpers

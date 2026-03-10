@@ -1,4 +1,4 @@
-# entsim - Enterprise Digital Twin
+# entwine - Enterprise Digital Twin
 
 LLM-powered simulation of SME operations. Models employee actions and interactions with digital platforms using AI agents.
 

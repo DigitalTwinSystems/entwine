@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from entsim.tools import ToolCall, ToolDispatcher, ToolResult
-from entsim.tools.builtin import delegate_task, query_knowledge, read_metrics
+from entwine.tools import ToolCall, ToolDispatcher, ToolResult
+from entwine.tools.builtin import delegate_task, query_knowledge, read_metrics
 
 # ---------------------------------------------------------------------------
 # Helpers

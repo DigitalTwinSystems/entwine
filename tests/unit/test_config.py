@@ -1,4 +1,4 @@
-"""Unit tests for entsim.config — models, loader, and settings."""
+"""Unit tests for entwine.config — models, loader, and settings."""
 
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from entsim.agents.models import WorkingHours
-from entsim.config.loader import load_config
-from entsim.config.models import (
+from entwine.agents.models import WorkingHours
+from entwine.config.loader import load_config
+from entwine.config.models import (
     AgentPersona,
     EnterpriseConfig,
     FullConfig,
@@ -103,7 +103,7 @@ _FULL_TOML = textwrap.dedent("""\
 
 def test_load_yaml_minimal(tmp_path: Path) -> None:
     """Minimal YAML with only required fields should load successfully."""
-    cfg_file = tmp_path / "entsim.yaml"
+    cfg_file = tmp_path / "entwine.yaml"
     cfg_file.write_text(_MINIMAL_YAML, encoding="utf-8")
 
     config = load_config(cfg_file)
@@ -116,7 +116,7 @@ def test_load_yaml_minimal(tmp_path: Path) -> None:
 
 def test_load_yaml_full(tmp_path: Path) -> None:
     """Full YAML with all optional fields should load and validate correctly."""
-    cfg_file = tmp_path / "entsim.yaml"
+    cfg_file = tmp_path / "entwine.yaml"
     cfg_file.write_text(_FULL_YAML, encoding="utf-8")
 
     config = load_config(cfg_file)
@@ -154,7 +154,7 @@ def test_load_yaml_yml_extension(tmp_path: Path) -> None:
 
 def test_load_toml_minimal(tmp_path: Path) -> None:
     """Minimal TOML with only required fields should load successfully."""
-    cfg_file = tmp_path / "entsim.toml"
+    cfg_file = tmp_path / "entwine.toml"
     cfg_file.write_text(_MINIMAL_TOML, encoding="utf-8")
 
     config = load_config(cfg_file)
@@ -166,7 +166,7 @@ def test_load_toml_minimal(tmp_path: Path) -> None:
 
 def test_load_toml_full(tmp_path: Path) -> None:
     """Full TOML config should load all nested structures correctly."""
-    cfg_file = tmp_path / "entsim.toml"
+    cfg_file = tmp_path / "entwine.toml"
     cfg_file.write_text(_FULL_TOML, encoding="utf-8")
 
     config = load_config(cfg_file)
@@ -338,10 +338,10 @@ def test_enterprise_config_defaults() -> None:
 
 
 def test_example_config_loads() -> None:
-    """The bundled examples/entsim.yaml should load without errors."""
-    example_path = Path(__file__).parent.parent.parent / "examples" / "entsim.yaml"
+    """The bundled examples/entwine.yaml should load without errors."""
+    example_path = Path(__file__).parent.parent.parent / "examples" / "entwine.yaml"
     if not example_path.exists():
-        pytest.skip("examples/entsim.yaml not present")
+        pytest.skip("examples/entwine.yaml not present")
 
     config = load_config(example_path)
     assert len(config.agents) >= 3

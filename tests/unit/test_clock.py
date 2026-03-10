@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from entsim.agents.models import WorkingHours
-from entsim.simulation.clock import SimulationClock
+from entwine.agents.models import WorkingHours
+from entwine.simulation.clock import SimulationClock
 
 # ---------------------------------------------------------------------------
 # Initial state

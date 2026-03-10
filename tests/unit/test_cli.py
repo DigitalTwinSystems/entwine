@@ -1,4 +1,4 @@
-"""Unit tests for the entsim CLI commands."""
+"""Unit tests for the entwine CLI commands."""
 
 from __future__ import annotations
 
@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
-import entsim
-from entsim.cli.main import app
+import entwine
+from entwine.cli.main import app
 
 runner = CliRunner()
 
@@ -47,7 +47,7 @@ agents: []
 @pytest.fixture()
 def valid_config_file(tmp_path: Path) -> Path:
     """Write a valid config YAML to a temp file."""
-    config_file = tmp_path / "entsim.yaml"
+    config_file = tmp_path / "entwine.yaml"
     config_file.write_text(VALID_CONFIG)
     return config_file
 
@@ -66,17 +66,17 @@ def invalid_config_file(tmp_path: Path) -> Path:
 
 
 def test_version_output() -> None:
-    """version command prints 'entsim <version>'."""
+    """version command prints 'entwine <version>'."""
     result = runner.invoke(app, ["version"])
     assert result.exit_code == 0
-    assert f"entsim {entsim.__version__}" in result.output
+    assert f"entwine {entwine.__version__}" in result.output
 
 
 def test_version_short_flag() -> None:
     """version --short prints only the version string."""
     result = runner.invoke(app, ["version", "--short"])
     assert result.exit_code == 0
-    assert result.output.strip() == entsim.__version__
+    assert result.output.strip() == entwine.__version__
 
 
 # ---------------------------------------------------------------------------
@@ -139,20 +139,20 @@ def test_start_valid_config_launches_uvicorn(valid_config_file: Path) -> None:
     """start with valid config prints banner and calls uvicorn.run."""
     from unittest.mock import patch
 
-    with patch("entsim.cli.main.uvicorn.run") as mock_uvicorn:
+    with patch("entwine.cli.main.uvicorn.run") as mock_uvicorn:
         result = runner.invoke(app, ["start", "--config", str(valid_config_file)])
 
     assert result.exit_code == 0, result.output
-    assert "Starting entsim" in result.output
+    assert "Starting entwine" in result.output
     assert "Test Sim" in result.output
-    mock_uvicorn.assert_called_once_with("entsim.web:app", host="127.0.0.1", port=8000)
+    mock_uvicorn.assert_called_once_with("entwine.web:app", host="127.0.0.1", port=8000)
 
 
 def test_start_custom_host_port(valid_config_file: Path) -> None:
     """start passes custom --host and --port to uvicorn."""
     from unittest.mock import patch
 
-    with patch("entsim.cli.main.uvicorn.run") as mock_uvicorn:
+    with patch("entwine.cli.main.uvicorn.run") as mock_uvicorn:
         result = runner.invoke(
             app,
             [
@@ -167,4 +167,4 @@ def test_start_custom_host_port(valid_config_file: Path) -> None:
         )
 
     assert result.exit_code == 0, result.output
-    mock_uvicorn.assert_called_once_with("entsim.web:app", host="0.0.0.0", port=9000)
+    mock_uvicorn.assert_called_once_with("entwine.web:app", host="0.0.0.0", port=9000)

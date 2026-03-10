@@ -6,9 +6,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from entsim.agents.memory import MemoryStore
-from entsim.rag.models import Document, SearchResult
-from entsim.rag.store import KnowledgeStore
+from entwine.agents.memory import MemoryStore
+from entwine.rag.models import Document, SearchResult
+from entwine.rag.store import KnowledgeStore
 
 
 @pytest.fixture()

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from entsim.observability.hooks import HookRegistry
-from entsim.observability.metrics import MetricsCollector
+from entwine.observability.hooks import HookRegistry
+from entwine.observability.metrics import MetricsCollector
 
 # ---------------------------------------------------------------------------
 # HookRegistry tests

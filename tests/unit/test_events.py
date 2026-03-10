@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from entsim.events import (
+from entwine.events import (
     AgentStateChanged,
     Event,
     EventBus,

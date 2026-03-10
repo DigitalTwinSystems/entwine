@@ -2,11 +2,11 @@
 
 **Status:** Accepted
 **Date:** 2026-03-10
-**Issue:** [#3](https://github.com/DigitalTwinSystems/entsim/issues/3)
+**Issue:** [#3](https://github.com/DigitalTwinSystems/entwine/issues/3)
 
 ## Context
 
-entsim agents need enterprise-specific context (org structure, processes, domain knowledge) to simulate realistic employee behavior. We need a knowledge layer supporting ~12 concurrent agents with role-based access to a shared document corpus (estimated 1,000–5,000 documents).
+entwine agents need enterprise-specific context (org structure, processes, domain knowledge) to simulate realistic employee behavior. We need a knowledge layer supporting ~12 concurrent agents with role-based access to a shared document corpus (estimated 1,000–5,000 documents).
 
 Requirements: async Python compatibility, hybrid search (semantic + keyword), role-based filtering, low operational complexity, minimal cost at this scale.
 

@@ -22,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --frozen
-      - run: uv run pytest tests/ --cov=src/entsim --cov-report=xml --cov-fail-under=80 -q
+      - run: uv run pytest tests/ --cov=src/entwine --cov-report=xml --cov-fail-under=80 -q
 
   validate-config:
     runs-on: ubuntu-latest
@@ -30,4 +30,4 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --frozen
-      - run: uv run python -c "from pathlib import Path; from entsim.config.loader import load_config; load_config(Path('examples/entsim.yaml'))"
+      - run: uv run python -c "from pathlib import Path; from entwine.config.loader import load_config; load_config(Path('examples/entwine.yaml'))"

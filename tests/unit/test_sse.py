@@ -8,10 +8,10 @@ import json
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from entsim.events.bus import EventBus
-from entsim.events.models import Event, TaskAssigned
-from entsim.web.app import app, get_event_collector
-from entsim.web.sse import EventCollector
+from entwine.events.bus import EventBus
+from entwine.events.models import Event, TaskAssigned
+from entwine.web.app import app, get_event_collector
+from entwine.web.sse import EventCollector
 
 # ---------------------------------------------------------------------------
 # EventCollector unit tests

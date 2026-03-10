@@ -1,6 +1,6 @@
 services:
-  entsim:
-    image: ghcr.io/digitaltwinsystems/entsim:latest
+  entwine:
+    image: ghcr.io/digitaltwinsystems/entwine:latest
     restart: unless-stopped
     deploy:
       resources:

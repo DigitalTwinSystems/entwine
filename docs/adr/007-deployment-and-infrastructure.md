@@ -2,11 +2,11 @@
 
 **Status:** Accepted
 **Date:** 2026-03-10
-**Issue:** [#7](https://github.com/DigitalTwinSystems/entsim/issues/7)
+**Issue:** [#7](https://github.com/DigitalTwinSystems/entwine/issues/7)
 
 ## Context
 
-entsim is a Python asyncio multi-agent system (ADR-001) running ~12 concurrent agents backed by Qdrant (ADR-003), LiteLLM (ADR-002), and a FastAPI/HTMX UI (ADR-004). We need to define:
+entwine is a Python asyncio multi-agent system (ADR-001) running ~12 concurrent agents backed by Qdrant (ADR-003), LiteLLM (ADR-002), and a FastAPI/HTMX UI (ADR-004). We need to define:
 
 - How the system runs locally during development
 - The minimum viable production deployment
@@ -37,7 +37,7 @@ See [Docker Compose merge documentation](https://docs.docker.com/compose/how-tos
 
 | Service | Image | Notes |
 |---------|-------|-------|
-| `entsim` | `python:3.12-slim` (built locally) | FastAPI app + agent runtime |
+| `entwine` | `python:3.12-slim` (built locally) | FastAPI app + agent runtime |
 | `qdrant` | `qdrant/qdrant:latest` | Vector store (ADR-003) |
 | `ollama` | `ollama/ollama:latest` | Local LLM for dev only (ADR-002) |
 
@@ -62,7 +62,7 @@ Single-stage build using `python:3.12-slim`. Multi-stage builds add complexity w
 Key practices ([Docker best practices](https://docs.docker.com/build/building/best-practices/)):
 - Copy `pyproject.toml` / `uv.lock` before source code to maximize layer cache hits
 - Install dependencies via `uv sync --no-dev --frozen`
-- Run as non-root user (`USER entsim`)
+- Run as non-root user (`USER entwine`)
 - Pin base image digest in CI for supply-chain integrity
 
 ```dockerfile
@@ -72,9 +72,9 @@ RUN pip install uv
 COPY pyproject.toml uv.lock ./
 RUN uv sync --no-dev --frozen
 COPY src/ ./src/
-RUN useradd -m entsim && chown -R entsim /app
-USER entsim
-CMD ["uv", "run", "entsim", "serve"]
+RUN useradd -m entwine && chown -R entwine /app
+USER entwine
+CMD ["uv", "run", "entwine", "serve"]
 ```
 
 ### Secrets management
@@ -148,7 +148,7 @@ No self-hosted runners at this stage.
 At ~12 agents all running in the same asyncio event loop, `asyncio.Queue` provides all inter-agent communication primitives needed. Adding RabbitMQ or Redis Streams at this scale would be over-engineering. Revisit if:
 - Agents need to survive process restarts (durability)
 - Agent count grows beyond what one process can handle
-- Multiple entsim instances need to share work
+- Multiple entwine instances need to share work
 
 ## Consequences
 

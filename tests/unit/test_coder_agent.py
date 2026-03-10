@@ -8,9 +8,9 @@ from typing import Any
 
 import pytest
 
-from entsim.agents.coder import CoderAgent
-from entsim.agents.coder_models import CodingTaskResult, SandboxSession
-from entsim.agents.models import AgentPersona, AgentState
+from entwine.agents.coder import CoderAgent
+from entwine.agents.coder_models import CodingTaskResult, SandboxSession
+from entwine.agents.models import AgentPersona, AgentState
 
 # ---------------------------------------------------------------------------
 # Helpers / fakes

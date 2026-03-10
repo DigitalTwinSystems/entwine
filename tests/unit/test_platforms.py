@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from entsim.platforms.base import PlatformAdapter
-from entsim.platforms.registry import PlatformRegistry
-from entsim.platforms.stubs import (
+from entwine.platforms.base import PlatformAdapter
+from entwine.platforms.registry import PlatformRegistry
+from entwine.platforms.stubs import (
     EmailAdapter,
     GitHubAdapter,
     LinkedInAdapter,

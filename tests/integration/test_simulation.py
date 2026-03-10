@@ -7,11 +7,11 @@ from pathlib import Path
 
 import pytest
 
-from entsim.agents.models import AgentState
-from entsim.config.loader import load_config
-from entsim.simulation.engine import SimulationEngine
+from entwine.agents.models import AgentState
+from entwine.config.loader import load_config
+from entwine.simulation.engine import SimulationEngine
 
-_EXAMPLE_CONFIG = Path(__file__).resolve().parents[2] / "examples" / "entsim.yaml"
+_EXAMPLE_CONFIG = Path(__file__).resolve().parents[2] / "examples" / "entwine.yaml"
 
 
 @pytest.mark.asyncio

@@ -2,11 +2,11 @@
 
 **Status:** Accepted
 **Date:** 2026-03-10
-**Issue:** [#5](https://github.com/DigitalTwinSystems/entsim/issues/5)
+**Issue:** [#5](https://github.com/DigitalTwinSystems/entwine/issues/5)
 
 ## Context
 
-entsim simulates SME operations using ~12 concurrent LLM agents that represent employees (CEO, CMO, developers, sales, etc.). Each agent must:
+entwine simulates SME operations using ~12 concurrent LLM agents that represent employees (CEO, CMO, developers, sales, etc.). Each agent must:
 
 - Maintain a persona, goals, and role-appropriate knowledge
 - Run continuously or on schedule across a simulation session
@@ -24,7 +24,7 @@ We reviewed four agent framework patterns before deciding on a custom lightweigh
 
 **Key insight from all frameworks:** agents are fundamentally a loop — `LLM call → tool dispatch → result integration → repeat until done`. The differences are in how state is persisted, how agents coordinate, and how lifecycle events are surfaced.
 
-entsim's requirements differ from typical chatbot/workflow agents:
+entwine's requirements differ from typical chatbot/workflow agents:
 
 - Agents are **long-lived and continuous**, not single-task runners. A CEO agent runs for the duration of a simulation session (hours).
 - Agents simulate **human-like schedules** — they are active during configured working hours and idle otherwise.

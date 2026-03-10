@@ -2,11 +2,11 @@
 
 **Status:** Accepted
 **Date:** 2026-03-10
-**Issue:** [#6](https://github.com/DigitalTwinSystems/entsim/issues/6)
+**Issue:** [#6](https://github.com/DigitalTwinSystems/entwine/issues/6)
 
 ## Context
 
-entsim agents must interact with external platforms to simulate realistic SME operations. This ADR evaluates which platforms expose usable APIs for automated agents, what authentication is required, what the cost and rate-limit constraints are, and whether real or simulated integrations are appropriate.
+entwine agents must interact with external platforms to simulate realistic SME operations. This ADR evaluates which platforms expose usable APIs for automated agents, what authentication is required, what the cost and rate-limit constraints are, and whether real or simulated integrations are appropriate.
 
 Constraints from prior ADRs:
 

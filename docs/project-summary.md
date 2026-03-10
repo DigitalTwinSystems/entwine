@@ -1,12 +1,12 @@
-# entsim — Project Summary
+# entwine — Project Summary
 
-**entsim** is an LLM-powered digital twin of a small-to-medium enterprise (SME). It simulates how a real company operates — its people, communications, decisions, and software development — using AI agents that behave like employees.
+**entwine** is an LLM-powered digital twin of a small-to-medium enterprise (SME). It simulates how a real company operates — its people, communications, decisions, and software development — using AI agents that behave like employees.
 
 ---
 
-## What is entsim?
+## What is entwine?
 
-A **digital twin** is a running software model of a real-world system. entsim applies this idea to a company: instead of modelling a factory floor or a power grid, it models the people, workflows, and digital tools that make up a small business.
+A **digital twin** is a running software model of a real-world system. entwine applies this idea to a company: instead of modelling a factory floor or a power grid, it models the people, workflows, and digital tools that make up a small business.
 
 Each simulated employee is an AI agent — a piece of software powered by a large language model (LLM) — that has a job title, a personality, goals, domain knowledge, and access to real digital platforms (email, Slack, GitHub, social media). The agents work, communicate, make decisions, and produce real digital artefacts during a simulation run.
 
@@ -14,7 +14,7 @@ Each simulated employee is an AI agent — a piece of software powered by a larg
 
 ## Why?
 
-Running experiments on a real company is slow, risky, and expensive. entsim lets teams compress time and explore "what if" questions safely.
+Running experiments on a real company is slow, risky, and expensive. entwine lets teams compress time and explore "what if" questions safely.
 
 | Use case | Description |
 |----------|-------------|
@@ -28,7 +28,7 @@ Running experiments on a real company is slow, risky, and expensive. entsim lets
 
 ## How it works
 
-At a high level, entsim runs a configurable number of AI agents — typically around 12 — simultaneously. Each agent:
+At a high level, entwine runs a configurable number of AI agents — typically around 12 — simultaneously. Each agent:
 
 1. **Has a defined persona**: a job title, background, goals, working hours, and the set of tools available to that role.
 2. **Reads from a shared knowledge base**: company documents, procedures, and context, filtered by what that role should have access to.
@@ -44,7 +44,7 @@ The simulation is configured entirely through human-readable files — an org ch
 
 ## The simulated enterprise
 
-A typical entsim simulation runs roughly 12 agents covering a realistic SME org chart:
+A typical entwine simulation runs roughly 12 agents covering a realistic SME org chart:
 
 | Role | What they do in the simulation |
 |------|-------------------------------|
@@ -85,7 +85,7 @@ All platform interactions go through a shared adapter layer that handles authent
 
 ## Coder agents
 
-One of entsim's distinctive capabilities is the ability to simulate software developers who write, test, and commit actual code.
+One of entwine's distinctive capabilities is the ability to simulate software developers who write, test, and commit actual code.
 
 A coder agent uses the [Claude Agent SDK](https://platform.claude.com/docs/en/agent-sdk/overview) to run an autonomous coding loop: it reads files, writes code, runs tests, and iterates until the task is complete — the same engine that powers Claude Code. Crucially, all code execution happens inside an isolated microVM (provided by [E2B](https://e2b.dev/)), so AI-generated code never runs on the host machine.
 

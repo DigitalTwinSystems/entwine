@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from entsim.web.app import app
+from entwine.web.app import app
 
 
 class TestDashboardRoutes:
@@ -17,7 +17,7 @@ class TestDashboardRoutes:
 
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
-        assert "entsim" in response.text
+        assert "entwine" in response.text
 
     @pytest.mark.asyncio
     async def test_get_agents_returns_html_fragment(self) -> None:

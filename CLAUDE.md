@@ -1,4 +1,4 @@
-# entsim — Claude Code Instructions
+# entwine — Claude Code Instructions
 
 Start with short, concrete intro.
 Work style: telegraph; noun-phrases ok; drop grammar; min tokens.

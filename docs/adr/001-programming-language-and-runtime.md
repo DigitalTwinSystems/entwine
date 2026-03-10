@@ -2,11 +2,11 @@
 
 **Status:** Accepted
 **Date:** 2026-03-10
-**Issue:** [#1](https://github.com/DigitalTwinSystems/entsim/issues/1)
+**Issue:** [#1](https://github.com/DigitalTwinSystems/entwine/issues/1)
 
 ## Context
 
-We need to choose a primary programming language and runtime for entsim — a digital twin platform that simulates SME operations using ~12 concurrent LLM agents interacting with external platforms (X, LinkedIn, Gmail/Office365, Reddit).
+We need to choose a primary programming language and runtime for entwine — a digital twin platform that simulates SME operations using ~12 concurrent LLM agents interacting with external platforms (X, LinkedIn, Gmail/Office365, Reddit).
 
 The workload is fundamentally I/O-bound: agents spend most of their time waiting for LLM API responses (100ms–30s per call). The language choice should optimize for ecosystem maturity, developer velocity, and framework availability rather than raw compute performance.
 
@@ -14,7 +14,7 @@ We evaluated four options: Python, TypeScript/Node.js, Go, and Rust, as well as 
 
 ## Decision
 
-**Python** is the primary language for entsim.
+**Python** is the primary language for entwine.
 
 Specific choices:
 

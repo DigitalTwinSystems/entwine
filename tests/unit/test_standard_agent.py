@@ -7,11 +7,11 @@ from typing import Any
 
 import pytest
 
-from entsim.agents.models import AgentPersona, AgentState
-from entsim.agents.standard import StandardAgent, _parse_tool_calls
-from entsim.llm.models import CompletionResponse, LLMTier
-from entsim.rag.models import Document, SearchResult
-from entsim.tools.models import ToolCall, ToolResult
+from entwine.agents.models import AgentPersona, AgentState
+from entwine.agents.standard import StandardAgent, _parse_tool_calls
+from entwine.llm.models import CompletionResponse, LLMTier
+from entwine.rag.models import Document, SearchResult
+from entwine.tools.models import ToolCall, ToolResult
 
 # ---------------------------------------------------------------------------
 # Helpers / fakes

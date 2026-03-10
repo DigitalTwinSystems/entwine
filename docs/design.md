@@ -1,4 +1,4 @@
-# entsim — System Design and Architecture
+# entwine — System Design and Architecture
 
 **Date:** 2026-03-10
 
@@ -8,7 +8,7 @@ This document synthesises ADR-001 through ADR-010 into a cohesive system design 
 
 ## 1. System Overview
 
-entsim is a digital twin platform that simulates SME operations using ~12 concurrent LLM-powered agents representing employees (CEO, CMO, developers, sales, QA, etc.). Agents interact with real external platforms (X, Gmail, Reddit, Slack, GitHub, Office 365) and a shared enterprise knowledge base to produce realistic simulated business activity.
+entwine is a digital twin platform that simulates SME operations using ~12 concurrent LLM-powered agents representing employees (CEO, CMO, developers, sales, QA, etc.). Agents interact with real external platforms (X, Gmail, Reddit, Slack, GitHub, Office 365) and a shared enterprise knowledge base to produce realistic simulated business activity.
 
 **Key properties:**
 
@@ -22,7 +22,7 @@ entsim is a digital twin platform that simulates SME operations using ~12 concur
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                         entsim process                              │
+│                         entwine process                              │
 │                                                                     │
 │  ┌─────────────┐   ┌──────────────────────────────────────────┐    │
 │  │    CLI      │   │           FastAPI server                 │    │
@@ -79,22 +79,22 @@ entsim is a digital twin platform that simulates SME operations using ~12 concur
 
 | Component | Location | Technology | ADR |
 |---|---|---|---|
-| Agent runtime | `src/entsim/agents/` | asyncio coroutines + dataclasses | ADR-005 |
-| LLM integration | `src/entsim/agents/` | LiteLLM Router | ADR-002 |
-| RAG / knowledge layer | `src/entsim/rag/` | Qdrant + text-embedding-3-small | ADR-003 |
-| Platform adapters | `src/entsim/platforms/` | tweepy, asyncpraw, slack-sdk, etc. | ADR-006 |
+| Agent runtime | `src/entwine/agents/` | asyncio coroutines + dataclasses | ADR-005 |
+| LLM integration | `src/entwine/agents/` | LiteLLM Router | ADR-002 |
+| RAG / knowledge layer | `src/entwine/rag/` | Qdrant + text-embedding-3-small | ADR-003 |
+| Platform adapters | `src/entwine/platforms/` | tweepy, asyncpraw, slack-sdk, etc. | ADR-006 |
 | Event bus | In-process | `asyncio.Queue` per agent | ADR-005 |
-| Simulation supervisor | `src/entsim/agents/supervisor.py` | Plain Python asyncio task | ADR-005 |
-| Config model | `src/entsim/config/` | Pydantic Settings + TOML + YAML | ADR-004 |
-| Monitoring UI | `src/entsim/web/` | FastAPI + HTMX + sse-starlette | ADR-004 |
-| CLI | `src/entsim/` | typer | ADR-004 |
-| Coder sub-system | `src/entsim/agents/coder/` | Claude Agent SDK + E2B | ADR-010 |
+| Simulation supervisor | `src/entwine/agents/supervisor.py` | Plain Python asyncio task | ADR-005 |
+| Config model | `src/entwine/config/` | Pydantic Settings + TOML + YAML | ADR-004 |
+| Monitoring UI | `src/entwine/web/` | FastAPI + HTMX + sse-starlette | ADR-004 |
+| CLI | `src/entwine/` | typer | ADR-004 |
+| Coder sub-system | `src/entwine/agents/coder/` | Claude Agent SDK + E2B | ADR-010 |
 | Observability | Cross-cutting | structlog + OpenTelemetry + Prometheus | ADR-007 |
 
 ### Package structure (ADR-008)
 
 ```
-src/entsim/
+src/entwine/
 ├── agents/
 │   ├── base.py          # AgentRuntime, lifecycle states, event loop
 │   ├── memory.py        # working context, short-term buffer, Qdrant writes
@@ -323,7 +323,7 @@ LinkedIn is simulated: the `LinkedInAdapter` stub logs intended actions to Qdran
 
 ## 6. Coder Agent Subsystem (ADR-010)
 
-Coder agents are standard entsim agents with an extended tool set and a sandboxed execution environment.
+Coder agents are standard entwine agents with an extended tool set and a sandboxed execution environment.
 
 ### 6.1 Architecture
 
@@ -396,7 +396,7 @@ Two complementary config file types, both validated by Pydantic Settings at star
 
 | Format | File | Content |
 |---|---|---|
-| TOML | `entsim.toml` | Flat simulation parameters: timing, LLM settings, feature flags, speed multiplier |
+| TOML | `entwine.toml` | Flat simulation parameters: timing, LLM settings, feature flags, speed multiplier |
 | YAML | `enterprise.yaml` | Hierarchical: org chart, agent personas, role relationships, platform credentials |
 
 Config is loaded via Pydantic Settings with layered priority: **file defaults < environment variables < CLI overrides**.
@@ -443,7 +443,7 @@ Config-as-code enables reproducible simulation experiments via git branches (e.g
 
 | Service | Image | Role |
 |---|---|---|
-| `entsim` | `python:3.12-slim` (local build) | FastAPI + agent runtime + supervisor |
+| `entwine` | `python:3.12-slim` (local build) | FastAPI + agent runtime + supervisor |
 | `qdrant` | `qdrant/qdrant:latest` | Vector store |
 | `ollama` | `ollama/ollama:latest` | Local LLM (dev only) |
 

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from entsim.agents.models import AgentPersona
-from entsim.agents.prompts import assemble_messages, build_system_prompt, estimate_tokens
+from entwine.agents.models import AgentPersona
+from entwine.agents.prompts import assemble_messages, build_system_prompt, estimate_tokens
 
 # ---------------------------------------------------------------------------
 # Helpers

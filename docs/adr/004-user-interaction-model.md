@@ -2,11 +2,11 @@
 
 **Status:** Accepted
 **Date:** 2026-03-10
-**Issue:** [#4](https://github.com/DigitalTwinSystems/entsim/issues/4)
+**Issue:** [#4](https://github.com/DigitalTwinSystems/entwine/issues/4)
 
 ## Context
 
-Users need to configure, monitor, and control the entsim simulation. The target audience is developers (initially). FastAPI is already the chosen HTTP framework (ADR-001). The system runs ~12 concurrent asyncio agents whose activity must be observable in real time.
+Users need to configure, monitor, and control the entwine simulation. The target audience is developers (initially). FastAPI is already the chosen HTTP framework (ADR-001). The system runs ~12 concurrent asyncio agents whose activity must be observable in real time.
 
 We evaluated five approaches: TUI (Textual), Web UI (HTMX, SvelteKit, Next.js), Desktop (Tauri, Electron), GitOps/config-as-code, and hybrid combinations.
 
@@ -19,7 +19,7 @@ We evaluated five approaches: TUI (Textual), Web UI (HTMX, SvelteKit, Next.js), 
 | Configuration | TOML + YAML, validated by [Pydantic Settings](https://docs.pydantic.dev/latest/concepts/pydantic_settings/) | Define enterprise structure, agent roles, simulation params |
 | Monitoring | [HTMX](https://htmx.org/) + [SSE via `sse-starlette`](https://pypi.org/project/sse-starlette/) | Real-time agent activity dashboard in browser |
 | Control | HTMX form posts to FastAPI | Pause/resume/step/configure simulation |
-| CLI | Python CLI (`click` or `typer`) | `entsim start`, `entsim pause`, `entsim export` |
+| CLI | Python CLI (`click` or `typer`) | `entwine start`, `entwine pause`, `entwine export` |
 
 ### Config file layout
 

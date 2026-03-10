@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import asyncio
 import collections
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from entsim.agents.models import AgentPersona, AgentState
+
+if TYPE_CHECKING:
+    from entsim.events.bus import EventBus
+    from entsim.events.models import Event
 
 log = structlog.get_logger(__name__)
 
@@ -37,11 +41,16 @@ class BaseAgent:
         persona: AgentPersona,
         event_bus: asyncio.Queue[Any],
         *,
+        typed_bus: EventBus | None = None,
         tick_interval: float = 0.05,
     ) -> None:
         self._persona = persona
         self._event_bus = event_bus
+        self._typed_bus = typed_bus
         self._tick_interval = tick_interval
+
+        # Internal inbox populated by EventBus subscriptions.
+        self._inbox: asyncio.Queue[Any] = asyncio.Queue() if typed_bus is not None else event_bus
 
         self._state: AgentState = AgentState.CREATED
         self._task: asyncio.Task[None] | None = None
@@ -89,6 +98,11 @@ class BaseAgent:
         return self._event_bus
 
     @property
+    def has_typed_bus(self) -> bool:
+        """Return True if the agent is connected to a typed EventBus."""
+        return self._typed_bus is not None
+
+    @property
     def is_task_done(self) -> bool:
         """Return True if the agent's asyncio Task has completed."""
         return self._task is not None and self._task.done()
@@ -104,6 +118,37 @@ class BaseAgent:
     def is_task_cancelled(self) -> bool:
         """Return True if the agent's asyncio Task was cancelled."""
         return self._task is not None and self._task.cancelled()
+
+    # ------------------------------------------------------------------
+    # EventBus integration
+    # ------------------------------------------------------------------
+
+    def subscribe(self, event_type: str) -> None:
+        """Subscribe to *event_type* on the typed EventBus, routing events to _inbox.
+
+        Raises RuntimeError if no typed EventBus is configured.
+        """
+        if self._typed_bus is None:
+            raise RuntimeError("No typed EventBus configured on this agent.")
+        self._typed_bus.subscribe(event_type, self._inbox.put_nowait)
+        log.debug("agent.subscribed", agent=self.name, event_type=event_type)
+
+    def subscribe_all(self) -> None:
+        """Subscribe to all events on the typed EventBus, routing them to _inbox.
+
+        Raises RuntimeError if no typed EventBus is configured.
+        """
+        if self._typed_bus is None:
+            raise RuntimeError("No typed EventBus configured on this agent.")
+        self._typed_bus.subscribe_all(self._inbox.put_nowait)
+        log.debug("agent.subscribed_all", agent=self.name)
+
+    async def publish(self, event: Event) -> None:
+        """Publish an event via the typed EventBus or fall back to the plain queue."""
+        if self._typed_bus is not None:
+            await self._typed_bus.publish(event)
+        else:
+            await self._event_bus.put(event)
 
     # ------------------------------------------------------------------
     # Lifecycle control
@@ -207,7 +252,7 @@ class BaseAgent:
     async def _next_event(self) -> Any | None:
         """Return the next event from the bus, waiting up to tick_interval seconds."""
         try:
-            return await asyncio.wait_for(self._event_bus.get(), timeout=self._tick_interval)
+            return await asyncio.wait_for(self._inbox.get(), timeout=self._tick_interval)
         except TimeoutError:
             return None
 

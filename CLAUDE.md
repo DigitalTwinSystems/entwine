@@ -23,6 +23,7 @@ Before completing any coding task, ALL must pass:
 - `uv run ruff check src/ tests/` — lint clean
 - `uv run ruff format --check src/ tests/` — format clean
 - `uv run pytest tests/ -q` — all tests green
+- Documentation up to date — ADRs, design.md, infrastructure.md reflect current state
 
 Write tests first or alongside code. No untested code merged.
 

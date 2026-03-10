@@ -17,6 +17,15 @@ Work style: telegraph; noun-phrases ok; drop grammar; min tokens.
 - Async runtime: asyncio (stdlib)
 - LLM integration: LiteLLM Router with Anthropic primary, OpenAI fallback (see ADR-002)
 
+## Code quality gates
+
+Before completing any coding task, ALL must pass:
+- `uv run ruff check src/ tests/` — lint clean
+- `uv run ruff format --check src/ tests/` — format clean
+- `uv run pytest tests/ -q` — all tests green
+
+Write tests first or alongside code. No untested code merged.
+
 ## Flow & Runtime
 
 - Use repo’s package manager/runtime; no swaps w/o approval.

@@ -1,0 +1,29 @@
+services:
+  entsim:
+    volumes:
+      - ./src:/app/src
+    command:
+      [
+        "uv",
+        "run",
+        "uvicorn",
+        "entsim.web.app:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--reload",
+      ]
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - entsim-net
+
+volumes:
+  ollama-data:

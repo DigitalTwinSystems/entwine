@@ -3,6 +3,22 @@
     "allow": [
       "Bash(gh *)",
       "Bash(git *)",
+      "Bash(source *)",
+      "Bash(uv *)",
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(pip *)",
+      "Bash(curl *)",
+      "Bash(docker *)",
+      "Bash(docker-compose *)",
+      "Bash(which *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)",
+      "Bash(rm *)",
+      "Bash(touch *)",
+      "Bash(cat *)",
+      "Bash(cd *)",
+      "Bash(sed *)",
       "WebSearch",
       "WebFetch(*)"
     ]

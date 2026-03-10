@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import math
+import re
+from collections import Counter
+
 import structlog
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
@@ -10,6 +14,8 @@ from qdrant_client.models import (
     Filter,
     MatchAny,
     PointStruct,
+    SparseVector,
+    SparseVectorParams,
     VectorParams,
 )
 
@@ -19,11 +25,17 @@ from entsim.rag.settings import RAGSettings
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
+_RRF_K = 60
+_SPARSE_VECTOR_NAME = "text_sparse"
+_TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
+
 
 class KnowledgeStore:
     """Qdrant-backed vector store for enterprise documents.
 
     Supports upserting documents and role-filtered semantic search.
+    When ``enable_hybrid`` is set, combines dense and sparse (BM25-style)
+    retrieval using Reciprocal Rank Fusion (RRF).
     """
 
     def __init__(
@@ -44,14 +56,25 @@ class KnowledgeStore:
             log.info("store.collection_already_exists")
             return
 
+        sparse_vectors_config = None
+        if self._settings.enable_hybrid:
+            sparse_vectors_config = {
+                _SPARSE_VECTOR_NAME: SparseVectorParams(),
+            }
+
         await self._client.create_collection(
             collection_name=self._settings.collection_name,
             vectors_config=VectorParams(
                 size=self._settings.embedding_dimensions,
                 distance=Distance.COSINE,
             ),
+            sparse_vectors_config=sparse_vectors_config,
         )
-        log.info("store.collection_created", dimensions=self._settings.embedding_dimensions)
+        log.info(
+            "store.collection_created",
+            dimensions=self._settings.embedding_dimensions,
+            hybrid=self._settings.enable_hybrid,
+        )
 
     async def upsert(self, documents: list[Document]) -> None:
         """Embed *documents* and upsert them into the collection.
@@ -72,14 +95,22 @@ class KnowledgeStore:
         texts = [doc.content for doc in documents]
         vectors = await self._embeddings.embed(texts)
 
-        points = [
-            PointStruct(
-                id=doc.id,
-                vector=vector,
-                payload={"content": doc.content, **doc.metadata},
+        points = []
+        for doc, vector in zip(documents, vectors, strict=True):
+            point_vector: dict | list[float] = vector
+            if self._settings.enable_hybrid:
+                sparse = self._build_sparse_vector(doc.content)
+                point_vector = {
+                    "": vector,
+                    _SPARSE_VECTOR_NAME: sparse,
+                }
+            points.append(
+                PointStruct(
+                    id=doc.id,
+                    vector=point_vector,
+                    payload={"content": doc.content, **doc.metadata},
+                )
             )
-            for doc, vector in zip(documents, vectors, strict=True)
-        ]
 
         await self._client.upsert(
             collection_name=self._settings.collection_name,
@@ -123,6 +154,7 @@ class KnowledgeStore:
             ]
         )
 
+        # Dense search (always performed)
         hits = await self._client.search(
             collection_name=self._settings.collection_name,
             query_vector=query_vector,
@@ -131,12 +163,96 @@ class KnowledgeStore:
             with_payload=True,
         )
 
+        dense_results = self._hits_to_results(hits)
+
+        if not self._settings.enable_hybrid:
+            log.info("store.search_complete", num_results=len(dense_results))
+            return dense_results
+
+        # Sparse search
+        sparse_query = self._build_sparse_vector(query)
+        sparse_response = await self._client.query_points(
+            collection_name=self._settings.collection_name,
+            query=sparse_query,
+            using=_SPARSE_VECTOR_NAME,
+            query_filter=role_filter,
+            limit=limit,
+            with_payload=True,
+        )
+        sparse_results = self._hits_to_results(sparse_response.points)
+
+        fused = self._rrf_fuse(dense_results, sparse_results, limit=limit)
+        log.info("store.search_complete", num_results=len(fused), hybrid=True)
+        return fused
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _build_sparse_vector(text: str) -> SparseVector:
+        """Create a BM25-style sparse vector from *text*.
+
+        Tokenises by extracting lowercase alphanumeric tokens, counts term
+        frequencies, applies a simple ``1 + log(tf)`` weighting, and hashes
+        each token to produce a sparse index.
+        """
+        tokens = _TOKEN_PATTERN.findall(text.lower())
+        if not tokens:
+            return SparseVector(indices=[], values=[])
+
+        counts = Counter(tokens)
+        indices: list[int] = []
+        values: list[float] = []
+        for term, count in sorted(counts.items()):
+            idx = hash(term) & 0xFFFFFFFF  # unsigned 32-bit
+            weight = 1.0 + math.log(count)
+            indices.append(idx)
+            values.append(weight)
+
+        return SparseVector(indices=indices, values=values)
+
+    @staticmethod
+    def _hits_to_results(hits: list) -> list[SearchResult]:
+        """Convert a list of Qdrant scored points to SearchResult objects."""
         results: list[SearchResult] = []
         for hit in hits:
             payload = dict(hit.payload) if hit.payload else {}
             content = str(payload.pop("content", ""))
             doc = Document(id=str(hit.id), content=content, metadata=payload)
             results.append(SearchResult(document=doc, score=hit.score))
-
-        log.info("store.search_complete", num_results=len(results))
         return results
+
+    @staticmethod
+    def _rrf_fuse(
+        dense_results: list[SearchResult],
+        sparse_results: list[SearchResult],
+        *,
+        limit: int = 5,
+    ) -> list[SearchResult]:
+        """Fuse two ranked lists using Reciprocal Rank Fusion (RRF).
+
+        For each document, the fused score is:
+            ``score = sum(1 / (k + rank_i))``
+        where *k* = 60 (the standard RRF constant) and *rank_i* is the
+        1-based rank in each result list the document appears in.
+        """
+        doc_map: dict[str, SearchResult] = {}
+        scores: dict[str, float] = {}
+
+        for rank, result in enumerate(dense_results, start=1):
+            doc_id = result.document.id
+            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (_RRF_K + rank)
+            if doc_id not in doc_map:
+                doc_map[doc_id] = result
+
+        for rank, result in enumerate(sparse_results, start=1):
+            doc_id = result.document.id
+            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (_RRF_K + rank)
+            if doc_id not in doc_map:
+                doc_map[doc_id] = result
+
+        ranked_ids = sorted(scores, key=lambda did: scores[did], reverse=True)[:limit]
+        return [
+            SearchResult(document=doc_map[did].document, score=scores[did]) for did in ranked_ids
+        ]

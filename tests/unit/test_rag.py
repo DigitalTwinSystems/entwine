@@ -339,3 +339,200 @@ class TestKnowledgeStoreSearch:
 
         mock_qdrant_client.upsert.assert_not_awaited()
         mock_embedding_service.embed.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
+# Hybrid search
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def hybrid_settings() -> RAGSettings:
+    return RAGSettings(
+        qdrant_url="http://localhost:6333",
+        collection_name="test_collection",
+        embedding_model="text-embedding-3-small",
+        embedding_dimensions=1536,
+        enable_hybrid=True,
+    )
+
+
+class TestBuildSparseVector:
+    def test_produces_indices_and_values(self) -> None:
+        sparse = KnowledgeStore._build_sparse_vector("hello world hello")
+        assert len(sparse.indices) > 0
+        assert len(sparse.values) > 0
+        assert len(sparse.indices) == len(sparse.values)
+
+    def test_repeated_tokens_increase_weight(self) -> None:
+        sparse = KnowledgeStore._build_sparse_vector("hello hello hello")
+        # Only one unique token, so one index
+        assert len(sparse.indices) == 1
+        # Weight should be > 1.0 because tf > 1
+        assert sparse.values[0] > 1.0
+
+    def test_empty_text(self) -> None:
+        sparse = KnowledgeStore._build_sparse_vector("")
+        assert sparse.indices == []
+        assert sparse.values == []
+
+    def test_case_insensitive(self) -> None:
+        lower = KnowledgeStore._build_sparse_vector("Hello World")
+        upper = KnowledgeStore._build_sparse_vector("hello world")
+        assert lower.indices == upper.indices
+        assert lower.values == upper.values
+
+
+class TestRRFFuse:
+    def test_fuse_merges_and_reranks(self) -> None:
+        doc_a = Document(id="a", content="A")
+        doc_b = Document(id="b", content="B")
+        doc_c = Document(id="c", content="C")
+
+        # dense: a=rank1, b=rank2
+        dense = [
+            SearchResult(document=doc_a, score=0.9),
+            SearchResult(document=doc_b, score=0.8),
+        ]
+        # sparse: c=rank1, a=rank2
+        sparse = [
+            SearchResult(document=doc_c, score=5.0),
+            SearchResult(document=doc_a, score=3.0),
+        ]
+
+        fused = KnowledgeStore._rrf_fuse(dense, sparse, limit=5)
+
+        # 'a' appears in both lists so should have the highest RRF score
+        assert fused[0].document.id == "a"
+        # All three documents should be present
+        ids = [r.document.id for r in fused]
+        assert set(ids) == {"a", "b", "c"}
+
+    def test_fuse_respects_limit(self) -> None:
+        docs = [Document(id=f"d{i}", content=f"doc {i}") for i in range(5)]
+        dense = [SearchResult(document=d, score=float(i)) for i, d in enumerate(docs)]
+        sparse: list[SearchResult] = []
+
+        fused = KnowledgeStore._rrf_fuse(dense, sparse, limit=2)
+        assert len(fused) == 2
+
+    def test_fuse_rrf_scores_are_correct(self) -> None:
+        doc_a = Document(id="a", content="A")
+        doc_b = Document(id="b", content="B")
+
+        dense = [SearchResult(document=doc_a, score=0.9)]
+        sparse = [SearchResult(document=doc_b, score=5.0)]
+
+        fused = KnowledgeStore._rrf_fuse(dense, sparse, limit=5)
+        # Both appear at rank 1 in their respective lists
+        expected_score = 1.0 / (60 + 1)
+        for result in fused:
+            assert result.score == pytest.approx(expected_score)
+
+
+class TestHybridSearch:
+    @pytest.mark.asyncio
+    async def test_init_collection_with_hybrid_creates_sparse_config(
+        self,
+        mock_qdrant_client: MagicMock,
+        mock_embedding_service: MagicMock,
+        hybrid_settings: RAGSettings,
+    ) -> None:
+        mock_qdrant_client.collection_exists.return_value = False
+
+        store = KnowledgeStore(
+            client=mock_qdrant_client,
+            embedding_service=mock_embedding_service,
+            settings=hybrid_settings,
+        )
+        await store.init_collection()
+
+        call_kwargs = mock_qdrant_client.create_collection.call_args.kwargs
+        assert "sparse_vectors_config" in call_kwargs
+        assert call_kwargs["sparse_vectors_config"] is not None
+        assert "text_sparse" in call_kwargs["sparse_vectors_config"]
+
+    @pytest.mark.asyncio
+    async def test_upsert_hybrid_includes_sparse_vectors(
+        self,
+        mock_qdrant_client: MagicMock,
+        hybrid_settings: RAGSettings,
+    ) -> None:
+        vectors = [[float(i)] * 1536 for i in range(2)]
+        embedding_service = MagicMock(spec=EmbeddingService)
+        embedding_service.embed = AsyncMock(return_value=vectors)
+
+        docs = [
+            Document(id="d1", content="First doc"),
+            Document(id="d2", content="Second doc"),
+        ]
+
+        store = KnowledgeStore(
+            client=mock_qdrant_client,
+            embedding_service=embedding_service,
+            settings=hybrid_settings,
+        )
+        await store.upsert(docs)
+
+        upsert_kwargs = mock_qdrant_client.upsert.call_args.kwargs
+        point = upsert_kwargs["points"][0]
+        # Vector should be a dict with dense ("") and sparse keys
+        assert isinstance(point.vector, dict)
+        assert "" in point.vector
+        assert "text_sparse" in point.vector
+
+    @pytest.mark.asyncio
+    async def test_search_hybrid_fuses_dense_and_sparse(
+        self,
+        mock_qdrant_client: MagicMock,
+        mock_embedding_service: MagicMock,
+        hybrid_settings: RAGSettings,
+    ) -> None:
+        dense_hits = [
+            _make_qdrant_hit("doc-1", "Dense match", 0.95),
+            _make_qdrant_hit("doc-2", "Dense only", 0.80),
+        ]
+        sparse_hits = [
+            _make_qdrant_hit("doc-3", "Sparse only", 4.0),
+            _make_qdrant_hit("doc-1", "Dense match", 3.0),
+        ]
+
+        mock_qdrant_client.search.return_value = dense_hits
+
+        sparse_response = MagicMock()
+        sparse_response.points = sparse_hits
+        mock_qdrant_client.query_points = AsyncMock(return_value=sparse_response)
+
+        store = KnowledgeStore(
+            client=mock_qdrant_client,
+            embedding_service=mock_embedding_service,
+            settings=hybrid_settings,
+        )
+        results = await store.search("test query", agent_role="developer", limit=5)
+
+        # doc-1 appears in both lists, should be ranked first
+        assert results[0].document.id == "doc-1"
+        # All three docs should appear
+        ids = [r.document.id for r in results]
+        assert set(ids) == {"doc-1", "doc-2", "doc-3"}
+        # query_points should have been called for sparse search
+        mock_qdrant_client.query_points.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_search_non_hybrid_does_not_call_query_points(
+        self,
+        mock_qdrant_client: MagicMock,
+        mock_embedding_service: MagicMock,
+        rag_settings: RAGSettings,
+    ) -> None:
+        mock_qdrant_client.search.return_value = []
+        mock_qdrant_client.query_points = AsyncMock()
+
+        store = KnowledgeStore(
+            client=mock_qdrant_client,
+            embedding_service=mock_embedding_service,
+            settings=rag_settings,
+        )
+        await store.search("test", agent_role="dev", limit=5)
+
+        mock_qdrant_client.query_points.assert_not_awaited()

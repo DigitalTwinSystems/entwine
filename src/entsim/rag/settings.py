@@ -18,3 +18,4 @@ class RAGSettings(BaseSettings):
     collection_name: str = "enterprise_knowledge"
     embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536
+    enable_hybrid: bool = False

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from typing import Any
 
 import pytest
@@ -303,7 +304,8 @@ async def test_supervisor_skip_strategy_on_error() -> None:
     supervisor = Supervisor([agent], default_recovery="skip")
     await supervisor.start_all()
     # Allow the failing task to complete and the watcher to observe it.
-    await asyncio.sleep(0.3)
+    # The watcher polls every 0.1s, so wait enough for at least one poll.
+    await asyncio.sleep(0.5)
     assert agent.state == AgentState.ERROR
     await supervisor.stop_all()
 
@@ -328,4 +330,176 @@ async def test_supervisor_restart_strategy_replaces_agent() -> None:
     assert isinstance(new_agent, _FailingAgent)
     # The restarted _FailingAgent will also fail, so it may be in ERROR state.
     assert new_agent.state in (AgentState.RUNNING, AgentState.STOPPED, AgentState.ERROR)
+    await supervisor.stop_all()
+
+
+# ---------------------------------------------------------------------------
+# BaseAgent.task_exception — line 115 (returns None when no task or cancelled)
+# ---------------------------------------------------------------------------
+
+
+class TestTaskExceptionProperty:
+    def test_returns_none_when_no_task(self) -> None:
+        agent, _ = make_agent()
+        assert agent.task_exception is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_task_cancelled(self) -> None:
+        agent, _ = make_agent()
+        agent.start()
+        await asyncio.sleep(0)
+        assert agent._task is not None
+        agent._task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await agent._task
+        assert agent.task_exception is None
+
+    @pytest.mark.asyncio
+    async def test_returns_exception_when_task_failed(self) -> None:
+        bus: asyncio.Queue[Any] = make_bus()
+        agent = _FailingAgent(persona=make_persona("fail_exc"), event_bus=bus)
+        agent.start()
+        await asyncio.sleep(0.15)
+        assert agent.is_task_done
+        exc = agent.task_exception
+        assert exc is not None
+        assert isinstance(exc, RuntimeError)
+
+
+# ---------------------------------------------------------------------------
+# BaseAgent.stop — lines 198-199 (timeout / cancel branch)
+# ---------------------------------------------------------------------------
+
+
+class _HangingAgent(BaseAgent):
+    """Agent whose _run loop ignores the stop event."""
+
+    async def _run(self) -> None:
+        self._transition(AgentState.RUNNING)
+        # Never checks stop_event — will only end via cancellation.
+        while True:
+            await asyncio.sleep(100)
+
+
+@pytest.mark.asyncio
+async def test_stop_cancels_on_timeout() -> None:
+    """When the task doesn't finish within the timeout, stop() should cancel it."""
+    bus = make_bus()
+    agent = _HangingAgent(persona=make_persona("hang"), event_bus=bus)
+    agent.start()
+    await asyncio.sleep(0)
+    assert agent.state == AgentState.RUNNING
+    # Call stop() which will time out waiting for _HangingAgent's infinite loop,
+    # triggering the except (TimeoutError, asyncio.CancelledError) branch.
+    await agent.stop()
+    assert agent.state == AgentState.STOPPED
+
+
+# ---------------------------------------------------------------------------
+# BaseAgent._run — line 215 (break after pause/resume when stop is set)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_run_exits_after_resume_when_stopped() -> None:
+    """The _run loop should break after resume_event.wait() if stop is set."""
+    agent, _ = make_agent()
+    agent.start()
+    await asyncio.sleep(0)
+    # Pause the agent so the loop blocks on _resume_event.wait().
+    await agent.pause()
+    assert agent.state == AgentState.PAUSED
+    # Give the loop time to reach the await _resume_event.wait() call.
+    await asyncio.sleep(0.15)
+    # Now set stop while paused, then unblock the resume.
+    agent._stop_event.set()
+    agent._resume_event.set()
+    # Give the loop a chance to observe stop and break.
+    await asyncio.sleep(0.15)
+    assert agent._task is not None
+    assert agent._task.done()
+
+
+# ---------------------------------------------------------------------------
+# Supervisor: start_all skips non-READY agents — line 81
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_supervisor_start_all_skips_non_ready() -> None:
+    agent, _ = make_agent("skip_me")
+    supervisor = Supervisor([agent])
+    # Force the agent into STOPPED so it's not READY.
+    agent._state = AgentState.STOPPED
+    await supervisor.start_all()
+    # Agent should still be STOPPED (skipped).
+    assert agent.state == AgentState.STOPPED
+    await supervisor.stop_all()
+
+
+# ---------------------------------------------------------------------------
+# Supervisor: _recover with "pause" strategy — lines 166-174
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_supervisor_pause_strategy_on_error() -> None:
+    bus: asyncio.Queue[Any] = make_bus()
+    agent = _FailingAgent(persona=make_persona("failing_pause"), event_bus=bus)
+    supervisor = Supervisor([agent], default_recovery="pause")
+    await supervisor.start_all()
+    # Wait long enough for the agent to fail and the watcher to observe it.
+    await asyncio.sleep(0.5)
+    # The agent should be in ERROR state; the "pause" strategy leaves it there.
+    assert agent.state == AgentState.ERROR
+    await supervisor.stop_all()
+
+
+# ---------------------------------------------------------------------------
+# Supervisor watcher: cancelled task branch (lines 135-136)
+# ---------------------------------------------------------------------------
+
+
+class _NormalAgent(BaseAgent):
+    """Agent that completes normally after a short wait."""
+
+    async def _run(self) -> None:
+        self._transition(AgentState.RUNNING)
+        # Short run then exit normally (no exception).
+        await asyncio.sleep(0.05)
+
+
+@pytest.mark.asyncio
+async def test_supervisor_watcher_detects_cancelled_task() -> None:
+    """Watcher should log and continue when an agent's task is cancelled."""
+    agent, _ = make_agent("cancel_me")
+    supervisor = Supervisor([agent])
+    await supervisor.start_all()
+    await asyncio.sleep(0)
+    # Cancel the agent's task directly.
+    assert agent._task is not None
+    agent._task.cancel()
+    # Let the watcher detect the cancellation.
+    await asyncio.sleep(0.3)
+    assert agent.is_task_cancelled
+    await supervisor.stop_all()
+
+
+# ---------------------------------------------------------------------------
+# Supervisor watcher: task done without exception (line 139)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_supervisor_watcher_detects_normal_completion() -> None:
+    """Watcher should skip agents whose tasks finished without error."""
+    bus = make_bus()
+    agent = _NormalAgent(persona=make_persona("normal"), event_bus=bus)
+    supervisor = Supervisor([agent])
+    await supervisor.start_all()
+    # Wait for the agent to complete naturally and the watcher to see it.
+    await asyncio.sleep(0.5)
+    assert agent.is_task_done
+    assert not agent.is_task_cancelled
+    assert agent.task_exception is None
     await supervisor.stop_all()

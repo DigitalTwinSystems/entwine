@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 
 from entsim.agents.coder import CoderAgent
-from entsim.agents.coder_models import CodingTaskResult
+from entsim.agents.coder_models import CodingTaskResult, SandboxSession
 from entsim.agents.models import AgentPersona, AgentState
 
 # ---------------------------------------------------------------------------
@@ -418,3 +418,171 @@ async def test_stop_cleans_up_sandbox() -> None:
     await agent.stop()
     assert provider.sandbox.killed is True
     assert agent._active_sandbox is None
+
+
+# ---------------------------------------------------------------------------
+# _call_llm — SDK error branch (lines 142-144)
+# ---------------------------------------------------------------------------
+
+
+class _ErrorSDKSession:
+    """Fake SDK session that raises during query."""
+
+    async def query(self, prompt: str) -> AsyncIterator[dict[str, Any]]:
+        raise ConnectionError("SDK connection lost")
+        yield  # type: ignore[misc]
+
+
+@pytest.mark.asyncio
+async def test_call_llm_returns_none_on_sdk_error() -> None:
+    agent = CoderAgent(
+        persona=_persona(),
+        event_bus=_bus(),
+        agent_sdk_factory=lambda: _ErrorSDKSession(),
+    )
+    result = await agent._call_llm({"type": "task"}, [])
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _execute_in_sandbox — exception branch (lines 190-192)
+# ---------------------------------------------------------------------------
+
+
+class _ExplodingSandbox:
+    """Sandbox that raises on run_command."""
+
+    async def run_command(self, cmd: str) -> Any:
+        raise OSError("disk full")
+
+    async def write_file(self, path: str, content: str) -> None:
+        pass
+
+    async def read_file(self, path: str) -> str:
+        return ""
+
+    async def kill(self) -> None:
+        pass
+
+
+class _ExplodingSandboxProvider:
+    async def create(self) -> _ExplodingSandbox:
+        return _ExplodingSandbox()
+
+
+@pytest.mark.asyncio
+async def test_execute_in_sandbox_returns_error_on_exception() -> None:
+    agent = CoderAgent(
+        persona=_persona(),
+        event_bus=_bus(),
+        sandbox_provider=_ExplodingSandboxProvider(),  # type: ignore[arg-type]
+    )
+    result = await agent._execute_in_sandbox("echo hello")
+    assert result.startswith("[error]")
+    assert "disk full" in result
+
+
+# ---------------------------------------------------------------------------
+# _handle_task_assigned — sandbox error output branch (line 230)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_handle_task_assigned_sandbox_error_output() -> None:
+    """When sandbox output starts with [error], the task result should indicate failure."""
+    # Use the exploding sandbox provider so _execute_in_sandbox returns "[error] ..."
+    chunks = [{"content": "run test", "tokens": 10}]
+    agent = CoderAgent(
+        persona=_persona(),
+        event_bus=_bus(),
+        sandbox_provider=_ExplodingSandboxProvider(),  # type: ignore[arg-type]
+        agent_sdk_factory=_sdk_factory(chunks),
+    )
+    event = {"type": "task_assigned", "payload": {"description": "Run tests"}}
+    result = await agent._handle_task_assigned(event)
+    assert isinstance(result, CodingTaskResult)
+    assert result.success is False
+    assert result.error is not None
+    assert result.error.startswith("[error]")
+
+
+# ---------------------------------------------------------------------------
+# stop() — sandbox cleanup error branch (lines 271-272)
+# ---------------------------------------------------------------------------
+
+
+class _FailKillSandbox:
+    async def run_command(self, cmd: str) -> FakeCommandResult:
+        return FakeCommandResult()
+
+    async def write_file(self, path: str, content: str) -> None:
+        pass
+
+    async def read_file(self, path: str) -> str:
+        return ""
+
+    async def kill(self) -> None:
+        raise RuntimeError("cleanup failed")
+
+
+@pytest.mark.asyncio
+async def test_stop_handles_sandbox_cleanup_error() -> None:
+    agent = CoderAgent(
+        persona=_persona(),
+        event_bus=_bus(),
+    )
+    # Manually set the sandbox so kill() will be called.
+    agent._active_sandbox = _FailKillSandbox()  # type: ignore[assignment]
+    # Should not raise despite cleanup error.
+    await agent.stop()
+    assert agent._active_sandbox is None
+    assert agent.state == AgentState.STOPPED
+
+
+# ---------------------------------------------------------------------------
+# _build_prompt — rag_results and repo_url branches (lines 288, 291-293)
+# ---------------------------------------------------------------------------
+
+
+class TestBuildPrompt:
+    def test_includes_repo_url(self) -> None:
+        agent = CoderAgent(
+            persona=_persona(backstory="Expert dev"),
+            event_bus=_bus(),
+            repo_url="https://github.com/org/repo",
+        )
+        prompt = agent._build_prompt("fix bug", [])
+        assert "https://github.com/org/repo" in prompt
+        assert "Expert dev" in prompt
+
+    def test_includes_rag_results(self) -> None:
+        agent = CoderAgent(
+            persona=_persona(),
+            event_bus=_bus(),
+        )
+        prompt = agent._build_prompt("fix bug", ["doc_snippet_1", "doc_snippet_2"])
+        assert "doc_snippet_1" in prompt
+        assert "doc_snippet_2" in prompt
+        assert "Relevant knowledge" in prompt
+
+    def test_converts_non_string_event(self) -> None:
+        agent = CoderAgent(persona=_persona(), event_bus=_bus())
+        prompt = agent._build_prompt({"type": "task"}, [])
+        assert "Task:" in prompt
+
+
+# ---------------------------------------------------------------------------
+# coder_models._utc_now — line 11 (exercised via SandboxSession default)
+# ---------------------------------------------------------------------------
+
+
+class TestCoderModels:
+    def test_sandbox_session_default_created_at(self) -> None:
+        """SandboxSession.created_at should use _utc_now as default factory."""
+        from datetime import UTC, datetime
+
+        before = datetime.now(UTC)
+        session = SandboxSession(sandbox_id="s1")
+        after = datetime.now(UTC)
+        assert before <= session.created_at <= after
+        assert session.is_active is True

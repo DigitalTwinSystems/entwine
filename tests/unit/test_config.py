@@ -247,6 +247,15 @@ def test_missing_agent_required_fields_raises(tmp_path: Path) -> None:
         load_config(cfg_file)
 
 
+def test_yaml_non_dict_top_level_raises(tmp_path: Path) -> None:
+    """A YAML file whose top-level is not a mapping should raise ValueError."""
+    cfg_file = tmp_path / "list.yaml"
+    cfg_file.write_text("- item1\n- item2\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="Expected a YAML mapping"):
+        load_config(cfg_file)
+
+
 def test_unsupported_extension_raises(tmp_path: Path) -> None:
     """A file with an unsupported extension should raise a ValueError."""
     cfg_file = tmp_path / "config.json"

@@ -113,3 +113,58 @@ def test_validate_invalid_config(invalid_config_file: Path) -> None:
     result = runner.invoke(app, ["validate", "--config", str(invalid_config_file)])
     assert result.exit_code != 0
     assert "Error" in result.output
+
+
+# ---------------------------------------------------------------------------
+# start command — lines 47-66
+# ---------------------------------------------------------------------------
+
+
+def test_start_missing_config(tmp_path: Path) -> None:
+    """start with a non-existent config file exits non-zero with error."""
+    missing = tmp_path / "does_not_exist.yaml"
+    result = runner.invoke(app, ["start", "--config", str(missing)])
+    assert result.exit_code != 0
+    assert "Error" in result.output
+
+
+def test_start_invalid_config(invalid_config_file: Path) -> None:
+    """start with an invalid config file exits non-zero with error."""
+    result = runner.invoke(app, ["start", "--config", str(invalid_config_file)])
+    assert result.exit_code != 0
+    assert "Error" in result.output
+
+
+def test_start_valid_config_launches_uvicorn(valid_config_file: Path) -> None:
+    """start with valid config prints banner and calls uvicorn.run."""
+    from unittest.mock import patch
+
+    with patch("entsim.cli.main.uvicorn.run") as mock_uvicorn:
+        result = runner.invoke(app, ["start", "--config", str(valid_config_file)])
+
+    assert result.exit_code == 0, result.output
+    assert "Starting entsim" in result.output
+    assert "Test Sim" in result.output
+    mock_uvicorn.assert_called_once_with("entsim.web:app", host="127.0.0.1", port=8000)
+
+
+def test_start_custom_host_port(valid_config_file: Path) -> None:
+    """start passes custom --host and --port to uvicorn."""
+    from unittest.mock import patch
+
+    with patch("entsim.cli.main.uvicorn.run") as mock_uvicorn:
+        result = runner.invoke(
+            app,
+            [
+                "start",
+                "--config",
+                str(valid_config_file),
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "9000",
+            ],
+        )
+
+    assert result.exit_code == 0, result.output
+    mock_uvicorn.assert_called_once_with("entsim.web:app", host="0.0.0.0", port=9000)

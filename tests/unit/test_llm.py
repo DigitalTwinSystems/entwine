@@ -117,6 +117,12 @@ class TestLLMRouterInit:
         LLMRouter()
         mock_router_cls.assert_called_once()
 
+    @patch("entsim.llm.router.Router")
+    def test_settings_property_returns_settings(self, _mock_router_cls: MagicMock) -> None:
+        settings = make_settings()
+        router = LLMRouter(settings=settings)
+        assert router.settings is settings
+
 
 # ---------------------------------------------------------------------------
 # Tier-to-model mapping tests
@@ -291,3 +297,91 @@ class TestModels:
         assert LLMTier.ROUTINE.value == "routine"
         assert LLMTier.STANDARD.value == "standard"
         assert LLMTier.COMPLEX.value == "complex"
+
+
+# ---------------------------------------------------------------------------
+# LLMRouter.complete_request — line 128
+# ---------------------------------------------------------------------------
+
+
+class TestCompleteRequest:
+    """Verify that complete_request() delegates to complete() correctly."""
+
+    def _make_router(self) -> tuple[LLMRouter, MagicMock]:
+        settings = make_settings()
+        with patch("entsim.llm.router.Router") as mock_router_cls:
+            mock_inner = MagicMock()
+            mock_router_cls.return_value = mock_inner
+            router = LLMRouter(settings=settings)
+        return router, mock_inner
+
+    @pytest.mark.asyncio
+    async def test_complete_request_delegates(self) -> None:
+        router, mock_inner = self._make_router()
+        mock_response = make_mock_response(model="openai/gpt-test-routine")
+        mock_inner.acompletion = AsyncMock(return_value=mock_response)
+
+        request = CompletionRequest(
+            tier=LLMTier.ROUTINE,
+            messages=[{"role": "user", "content": "hello"}],
+        )
+
+        with patch("entsim.llm.router.litellm.completion_cost", return_value=0.001):
+            result = await router.complete_request(request)
+
+        assert isinstance(result, CompletionResponse)
+        assert result.content == "Hello"
+        mock_inner.acompletion.assert_awaited_once()
+        call_kwargs = mock_inner.acompletion.call_args.kwargs
+        assert call_kwargs["model"] == "routine"
+
+    @pytest.mark.asyncio
+    async def test_complete_request_with_tools(self) -> None:
+        router, mock_inner = self._make_router()
+        mock_response = make_mock_response()
+        mock_inner.acompletion = AsyncMock(return_value=mock_response)
+
+        tools = [{"type": "function", "function": {"name": "t", "parameters": {}}}]
+        request = CompletionRequest(
+            tier=LLMTier.STANDARD,
+            messages=[{"role": "user", "content": "hi"}],
+            tools=tools,
+        )
+
+        with patch("entsim.llm.router.litellm.completion_cost", return_value=0.001):
+            await router.complete_request(request)
+
+        call_kwargs = mock_inner.acompletion.call_args.kwargs
+        assert call_kwargs["tools"] == tools
+
+
+# ---------------------------------------------------------------------------
+# LLMRouter.complete — no usage / no choices edge cases (line 52 fallback)
+# ---------------------------------------------------------------------------
+
+
+class TestCompleteEdgeCases:
+    def _make_router(self) -> tuple[LLMRouter, MagicMock]:
+        settings = make_settings()
+        with patch("entsim.llm.router.Router") as mock_router_cls:
+            mock_inner = MagicMock()
+            mock_router_cls.return_value = mock_inner
+            router = LLMRouter(settings=settings)
+        return router, mock_inner
+
+    @pytest.mark.asyncio
+    async def test_complete_with_no_usage(self) -> None:
+        """When the response has no usage attribute, tokens should be 0."""
+        router, mock_inner = self._make_router()
+        response = MagicMock()
+        response.model = "test"
+        response.usage = None
+        response.choices = []
+        mock_inner.acompletion = AsyncMock(return_value=response)
+
+        with patch("entsim.llm.router.litellm.completion_cost", return_value=0.0):
+            result = await router.complete(LLMTier.STANDARD, [{"role": "user", "content": "x"}])
+
+        assert result.input_tokens == 0
+        assert result.output_tokens == 0
+        assert result.content == ""

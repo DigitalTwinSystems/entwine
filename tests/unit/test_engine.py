@@ -198,3 +198,70 @@ class TestWorldState:
         assert isinstance(engine.world_state, dict)
         engine.world_state["key"] = "value"
         assert engine.world_state["key"] == "value"
+
+
+# ---------------------------------------------------------------------------
+# _is_coder_persona helper — line 92
+# ---------------------------------------------------------------------------
+
+
+class TestIsCoderPersona:
+    def test_returns_true_for_coder_tools(self) -> None:
+        from entsim.simulation.engine import _is_coder_persona
+
+        p = _persona(name="dev", tools=["create_pr", "read_metrics"])
+        assert _is_coder_persona(p) is True
+
+    def test_returns_false_for_non_coder_tools(self) -> None:
+        from entsim.simulation.engine import _is_coder_persona
+
+        p = _persona(name="pm", tools=["read_metrics", "draft_email"])
+        assert _is_coder_persona(p) is False
+
+    def test_returns_false_for_empty_tools(self) -> None:
+        from entsim.simulation.engine import _is_coder_persona
+
+        p = _persona(name="nobody", tools=[])
+        assert _is_coder_persona(p) is False
+
+
+# ---------------------------------------------------------------------------
+# Tick loop — clock not running (line 266) and max_ticks reached (269-270)
+# ---------------------------------------------------------------------------
+
+
+class TestTickLoop:
+    @pytest.mark.asyncio
+    async def test_tick_loop_skips_when_clock_stopped(self) -> None:
+        """_tick_loop should continue (not tick) when clock is not running."""
+        config = _minimal_config(
+            simulation=SimulationConfig(name="test-sim", tick_interval_seconds=0.01),
+        )
+        engine = SimulationEngine(config)
+
+        await engine.start()
+        # Immediately stop the clock but leave the tick task running.
+        engine._clock.stop()
+        await asyncio.sleep(0.05)
+        ticks_while_stopped = engine.elapsed_ticks
+        await asyncio.sleep(0.05)
+        # Should not have advanced ticks while clock is stopped.
+        assert engine.elapsed_ticks == ticks_while_stopped
+        await engine.stop()
+
+    @pytest.mark.asyncio
+    async def test_tick_loop_stops_at_max_ticks(self) -> None:
+        """_tick_loop should break when max_ticks is reached."""
+        config = _minimal_config(
+            simulation=SimulationConfig(name="test-sim", tick_interval_seconds=0.01, max_ticks=3),
+        )
+        engine = SimulationEngine(config)
+
+        await engine.start()
+        # Wait enough for ticks to complete.
+        await asyncio.sleep(0.2)
+        assert engine.elapsed_ticks >= 3
+        # The tick task should have completed naturally.
+        assert engine._tick_task is not None
+        assert engine._tick_task.done()
+        await engine.stop()

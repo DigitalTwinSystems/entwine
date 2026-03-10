@@ -287,6 +287,21 @@ async def test_multiple_subscribers_for_same_event_type() -> None:
 
 
 @pytest.mark.asyncio
+async def test_start_already_running_is_noop() -> None:
+    """Starting a bus that is already running should log a warning and be a no-op."""
+    bus = EventBus()
+    await bus.start()
+    # Second start should not raise.
+    await bus.start()
+    # The bus should still work normally.
+    received: list[Event] = []
+    bus.subscribe_all(lambda e: received.append(e))
+    await bus.publish(TaskAssigned(source_agent="ceo"))
+    await bus.stop()
+    assert len(received) == 1
+
+
+@pytest.mark.asyncio
 async def test_stop_is_idempotent() -> None:
     bus = EventBus()
     await bus.start()

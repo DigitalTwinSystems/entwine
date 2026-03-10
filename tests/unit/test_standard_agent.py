@@ -368,3 +368,62 @@ async def test_full_lifecycle_with_mocked_llm() -> None:
 
     await agent.stop()
     assert agent.state == AgentState.STOPPED
+
+
+# ---------------------------------------------------------------------------
+# _dispatch_tools — non-CompletionResponse input (line 109)
+# ---------------------------------------------------------------------------
+
+
+class TestDispatchToolsEdgeCases:
+    @pytest.mark.asyncio
+    async def test_returns_empty_for_non_completion_response(self) -> None:
+        dispatcher = FakeToolDispatcher()
+        agent = StandardAgent(
+            persona=_persona(),
+            event_bus=_bus(),
+            tool_dispatcher=dispatcher,  # type: ignore[arg-type]
+        )
+        result = await agent._dispatch_tools("not a CompletionResponse")
+        assert result == []
+        assert len(dispatcher.calls) == 0
+
+
+# ---------------------------------------------------------------------------
+# _emit_events — non-CompletionResponse input (line 129)
+# ---------------------------------------------------------------------------
+
+
+class TestEmitEventsEdgeCases:
+    @pytest.mark.asyncio
+    async def test_no_emit_for_non_completion_response(self) -> None:
+        bus: asyncio.Queue[Any] = _bus()
+        agent = StandardAgent(persona=_persona(), event_bus=bus)
+        await agent._emit_events("plain string, not CompletionResponse", [])
+        assert bus.empty()
+
+
+# ---------------------------------------------------------------------------
+# _parse_tool_calls — invalid JSON branch (lines 172-173)
+# ---------------------------------------------------------------------------
+
+
+class TestParseToolCallsEdgeCases:
+    def test_invalid_json_is_skipped(self) -> None:
+        content = "<tool_call>not valid json</tool_call>"
+        calls = _parse_tool_calls(content)
+        assert calls == []
+
+    def test_missing_name_key_is_skipped(self) -> None:
+        content = '<tool_call>{"arguments": {"x": 1}}</tool_call>'
+        calls = _parse_tool_calls(content)
+        assert calls == []
+
+    def test_valid_and_invalid_mixed(self) -> None:
+        content = (
+            '<tool_call>{"name": "good_tool", "arguments": {}}</tool_call>'
+            "<tool_call>INVALID</tool_call>"
+        )
+        calls = _parse_tool_calls(content)
+        assert len(calls) == 1
+        assert calls[0].name == "good_tool"

@@ -25,6 +25,11 @@ from entsim.simulation.clock import SimulationClock
 from entsim.tools.builtin import delegate_task, query_knowledge, read_metrics
 from entsim.tools.dispatcher import ToolDispatcher
 
+try:
+    from entsim.llm.router import LLMRouter
+except Exception:  # pragma: no cover
+    LLMRouter = None  # type: ignore[assignment,misc]
+
 log = structlog.get_logger(__name__)
 
 # Tool names that indicate a CoderAgent should be used.
@@ -99,8 +104,14 @@ class SimulationEngine:
     to begin the simulation loop and :meth:`stop` to tear everything down.
     """
 
-    def __init__(self, config: FullConfig) -> None:
+    def __init__(
+        self,
+        config: FullConfig,
+        *,
+        llm_router: LLMRouter | None = None,
+    ) -> None:
         self._config = config
+        self._llm_router = llm_router
 
         # Shared subsystems.
         self._event_bus = EventBus()
@@ -146,6 +157,7 @@ class SimulationEngine:
             agent = StandardAgent(
                 persona=persona,
                 event_bus=queue,
+                llm_router=self._llm_router,
                 tool_dispatcher=self._tool_dispatcher,
                 tick_interval=0.05,
             )
@@ -163,6 +175,11 @@ class SimulationEngine:
     async def start(self) -> None:
         """Start every subsystem and begin the tick loop."""
         await self._event_bus.start()
+
+        # Subscribe all agents to the bus so they receive events.
+        for agent in self._agents:
+            agent.subscribe_all()
+
         await self._supervisor.start_all()
         self._clock.start()
 

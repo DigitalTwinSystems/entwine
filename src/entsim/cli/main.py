@@ -43,7 +43,7 @@ def start(
         show_default=True,
     ),
 ) -> None:
-    """Load config, print a startup banner, and start the FastAPI server."""
+    """Load config, create the simulation engine, and start the FastAPI server."""
     try:
         cfg = load_config(config)
     except FileNotFoundError as exc:
@@ -54,15 +54,26 @@ def start(
         raise typer.Exit(code=1) from exc
 
     agent_count = len(cfg.agents)
+
+    # Create LLM router (reads API keys from env).
+    from entsim.llm.router import LLMRouter
+    from entsim.llm.settings import LLMSettings
+    from entsim.simulation.engine import SimulationEngine
+    from entsim.web.app import set_engine
+
+    llm_settings = LLMSettings()
+    llm_router = LLMRouter(settings=llm_settings)
+
+    engine = SimulationEngine(cfg, llm_router=llm_router)
+    set_engine(engine)
+
     typer.echo(
         f"Starting entsim — simulation: {cfg.simulation.name!r}, "
         f"agents: {agent_count}, "
+        f"LLM: {llm_settings.standard_model}, "
         f"server: http://{host}:{port}"
     )
 
-    # Simulation orchestration will be wired up in a later issue.
-    # For now, point uvicorn at the web app factory string so the import
-    # is deferred until the web package is implemented.
     uvicorn.run("entsim.web:app", host=host, port=port)
 
 

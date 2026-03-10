@@ -13,17 +13,52 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 router = APIRouter()
 
-# Placeholder agent data used until the simulation runtime is wired in.
-_DEMO_AGENTS = [
-    {"name": "ceo", "role": "Chief Executive Officer", "department": "Executive", "state": "READY"},
-    {
-        "name": "cto",
-        "role": "Chief Technology Officer",
-        "department": "Engineering",
-        "state": "READY",
-    },
-    {"name": "cmo", "role": "Chief Marketing Officer", "department": "Marketing", "state": "READY"},
-]
+
+def _get_agents_data() -> list[dict[str, str]]:
+    """Return agent data from the live engine, or demo data as fallback."""
+    from entsim.web.app import get_engine
+
+    engine = get_engine()
+    if engine is not None:
+        return [
+            {
+                "name": agent.name,
+                "role": agent.persona.role,
+                "department": agent.persona.department,
+                "state": agent.state.value,
+            }
+            for agent in engine._agents
+        ]
+    return [
+        {
+            "name": "ceo",
+            "role": "Chief Executive Officer",
+            "department": "Executive",
+            "state": "READY",
+        },
+        {
+            "name": "cto",
+            "role": "Chief Technology Officer",
+            "department": "Engineering",
+            "state": "READY",
+        },
+        {
+            "name": "cmo",
+            "role": "Chief Marketing Officer",
+            "department": "Marketing",
+            "state": "READY",
+        },
+    ]
+
+
+def _get_simulation_status() -> str:
+    """Return current simulation status string."""
+    from entsim.web.app import get_engine
+
+    engine = get_engine()
+    if engine is not None:
+        return "running" if engine.is_running else "stopped"
+    return "stopped"
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -32,7 +67,7 @@ async def dashboard(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
         "dashboard.html",
-        {"agents": _DEMO_AGENTS, "simulation_status": "stopped"},
+        {"agents": _get_agents_data(), "simulation_status": _get_simulation_status()},
     )
 
 
@@ -40,7 +75,7 @@ async def dashboard(request: Request) -> HTMLResponse:
 async def agents(request: Request) -> HTMLResponse:
     """Return agent status cards as an HTML fragment (HTMX polling fallback)."""
     cards_html = ""
-    for agent in _DEMO_AGENTS:
+    for agent in _get_agents_data():
         cards_html += (
             f'<div class="agent-card">'
             f'<div class="agent-name">{agent["name"]}</div>'
@@ -57,17 +92,32 @@ async def agents(request: Request) -> HTMLResponse:
 
 @router.post("/simulation/start")
 async def simulation_start() -> dict[str, str]:
-    """Start the simulation (placeholder)."""
+    """Start the simulation."""
+    from entsim.web.app import get_engine
+
+    engine = get_engine()
+    if engine is not None and not engine.is_running:
+        await engine.start()
     return {"status": "ok"}
 
 
 @router.post("/simulation/pause")
 async def simulation_pause() -> dict[str, str]:
-    """Pause the simulation (placeholder)."""
+    """Pause the simulation."""
+    from entsim.web.app import get_engine
+
+    engine = get_engine()
+    if engine is not None:
+        await engine.pause()
     return {"status": "ok"}
 
 
 @router.post("/simulation/stop")
 async def simulation_stop() -> dict[str, str]:
-    """Stop the simulation (placeholder)."""
+    """Stop the simulation."""
+    from entsim.web.app import get_engine
+
+    engine = get_engine()
+    if engine is not None:
+        await engine.stop()
     return {"status": "ok"}

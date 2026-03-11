@@ -5,7 +5,13 @@ from __future__ import annotations
 from typing import Any
 
 from entwine.agents.models import AgentPersona
-from entwine.config.models import EnterpriseConfig, FullConfig, SimulationConfig
+from entwine.config.models import (
+    DepartmentConfig,
+    EnterpriseConfig,
+    FullConfig,
+    ReportingLine,
+    SimulationConfig,
+)
 from entwine.llm.models import CompletionResponse, LLMTier
 
 
@@ -23,16 +29,27 @@ def make_persona(name: str, role: str, **overrides: Any) -> AgentPersona:
     return AgentPersona(**defaults)
 
 
-def make_config(agents: list[AgentPersona], **sim_overrides: Any) -> FullConfig:
+def make_config(
+    agents: list[AgentPersona],
+    *,
+    departments: list[DepartmentConfig] | None = None,
+    reporting_lines: list[ReportingLine] | None = None,
+    **sim_overrides: Any,
+) -> FullConfig:
     sim_defaults: dict[str, Any] = {
         "name": "scenario_test",
         "tick_interval_seconds": 0.01,
         "max_ticks": None,
     }
     sim_defaults.update(sim_overrides)
+    enterprise_kwargs: dict[str, Any] = {"name": "ScenarioCorp"}
+    if departments:
+        enterprise_kwargs["departments"] = departments
+    if reporting_lines:
+        enterprise_kwargs["reporting_lines"] = reporting_lines
     return FullConfig(
         simulation=SimulationConfig(**sim_defaults),
-        enterprise=EnterpriseConfig(name="ScenarioCorp"),
+        enterprise=EnterpriseConfig(**enterprise_kwargs),
         agents=agents,
     )
 

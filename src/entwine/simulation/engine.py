@@ -18,7 +18,20 @@ from entwine.observability.cost_tracker import CostTracker
 from entwine.platforms.factory import build_platform_registry
 from entwine.platforms.registry import PlatformRegistry
 from entwine.simulation.clock import SimulationClock
-from entwine.tools.builtin import delegate_task, query_knowledge, read_metrics
+from entwine.tools.builtin import (
+    create_github_issue,
+    create_pr,
+    delegate_task,
+    draft_email,
+    post_to_linkedin,
+    post_to_slack,
+    post_to_x,
+    query_knowledge,
+    read_company_metrics,
+    read_crm,
+    schedule_meeting,
+    update_crm_ticket,
+)
 from entwine.tools.dispatcher import ToolDispatcher
 
 try:
@@ -72,10 +85,129 @@ def _build_tool_dispatcher() -> ToolDispatcher:
         },
     )
     dispatcher.register(
-        name="read_metrics",
-        handler=read_metrics,
-        description="Read current simulation metrics.",
+        name="read_company_metrics",
+        handler=read_company_metrics,
+        description="Read current company and simulation metrics.",
         parameters={"type": "object", "properties": {}},
+    )
+    dispatcher.register(
+        name="schedule_meeting",
+        handler=schedule_meeting,
+        description="Schedule a meeting with specified attendees.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "attendees": {"type": "string"},
+                "time": {"type": "string"},
+                "agenda": {"type": "string"},
+            },
+            "required": ["attendees", "time", "agenda"],
+        },
+    )
+    dispatcher.register(
+        name="draft_email",
+        handler=draft_email,
+        description="Draft an email message.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "to": {"type": "string"},
+                "subject": {"type": "string"},
+                "body": {"type": "string"},
+            },
+            "required": ["to", "subject", "body"],
+        },
+    )
+    dispatcher.register(
+        name="post_to_slack",
+        handler=post_to_slack,
+        description="Post a message to a Slack channel.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "channel": {"type": "string"},
+                "message": {"type": "string"},
+            },
+            "required": ["channel", "message"],
+        },
+    )
+    dispatcher.register(
+        name="post_to_linkedin",
+        handler=post_to_linkedin,
+        description="Publish a post to LinkedIn.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "content": {"type": "string"},
+            },
+            "required": ["content"],
+        },
+    )
+    dispatcher.register(
+        name="post_to_x",
+        handler=post_to_x,
+        description="Publish a post to X (Twitter).",
+        parameters={
+            "type": "object",
+            "properties": {
+                "content": {"type": "string"},
+            },
+            "required": ["content"],
+        },
+    )
+    dispatcher.register(
+        name="create_github_issue",
+        handler=create_github_issue,
+        description="Create a GitHub issue.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "body": {"type": "string"},
+                "labels": {"type": "string", "default": ""},
+            },
+            "required": ["title", "body"],
+        },
+    )
+    dispatcher.register(
+        name="create_pr",
+        handler=create_pr,
+        description="Create a GitHub pull request.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "title": {"type": "string"},
+                "body": {"type": "string"},
+                "branch": {"type": "string"},
+            },
+            "required": ["title", "body", "branch"],
+        },
+    )
+    dispatcher.register(
+        name="read_crm",
+        handler=read_crm,
+        description="Query the CRM system for customer or deal information.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "query": {"type": "string"},
+            },
+            "required": ["query"],
+        },
+    )
+    dispatcher.register(
+        name="update_crm_ticket",
+        handler=update_crm_ticket,
+        description="Update the status of a CRM ticket.",
+        parameters={
+            "type": "object",
+            "properties": {
+                "ticket_id": {"type": "string"},
+                "status": {"type": "string"},
+                "note": {"type": "string", "default": ""},
+            },
+            "required": ["ticket_id", "status"],
+        },
     )
     return dispatcher
 
@@ -141,6 +273,36 @@ class SimulationEngine:
     # Agent construction
     # ------------------------------------------------------------------
 
+    def _build_org_context(self, persona: AgentPersona) -> str:
+        """Build org-context string for an agent from enterprise config."""
+        enterprise = self._config.enterprise
+        parts: list[str] = []
+
+        # Find manager and direct reports from reporting lines.
+        manager = None
+        reports: list[str] = []
+        for line in enterprise.reporting_lines:
+            if line.subordinate == persona.name:
+                manager = line.manager
+            if line.manager == persona.name:
+                reports.append(line.subordinate)
+
+        if manager:
+            parts.append(f"Reports to: {manager}")
+        if reports:
+            parts.append(f"Direct reports: {', '.join(reports)}")
+
+        # Find department head.
+        for dept in enterprise.departments:
+            if dept.name == persona.department and dept.head and dept.head != persona.name:
+                parts.append(f"Department head: {dept.head}")
+                break
+
+        if enterprise.cross_department_channels:
+            parts.append(f"Cross-dept channels: {', '.join(enterprise.cross_department_channels)}")
+
+        return "; ".join(parts)
+
     def _create_agents(self, personas: list[AgentPersona]) -> list[StandardAgent]:
         """Instantiate agents from persona configs.
 
@@ -159,6 +321,10 @@ class SimulationEngine:
                 cost_tracker=self._cost_tracker,
                 tick_interval=0.05,
             )
+            # Inject org context into the agent's world context.
+            org_ctx = self._build_org_context(persona)
+            if org_ctx:
+                agent._org_context = org_ctx
             # Wire up the typed EventBus for pub/sub routing.
             agent._typed_bus = self._event_bus
             agent._inbox = asyncio.Queue()

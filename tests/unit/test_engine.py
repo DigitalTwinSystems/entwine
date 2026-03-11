@@ -209,13 +209,13 @@ class TestIsCoderPersona:
     def test_returns_true_for_coder_tools(self) -> None:
         from entwine.simulation.engine import _is_coder_persona
 
-        p = _persona(name="dev", tools=["create_pr", "read_metrics"])
+        p = _persona(name="dev", tools=["create_pr", "read_company_metrics"])
         assert _is_coder_persona(p) is True
 
     def test_returns_false_for_non_coder_tools(self) -> None:
         from entwine.simulation.engine import _is_coder_persona
 
-        p = _persona(name="pm", tools=["read_metrics", "draft_email"])
+        p = _persona(name="pm", tools=["read_company_metrics", "draft_email"])
         assert _is_coder_persona(p) is False
 
     def test_returns_false_for_empty_tools(self) -> None:

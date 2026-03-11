@@ -14,6 +14,7 @@ def build_system_prompt(
     persona: AgentPersona,
     available_tools: list[str] | None = None,
     world_context: str = "",
+    org_context: str = "",
 ) -> str:
     """Build a system prompt from persona fields.
 
@@ -29,6 +30,8 @@ def build_system_prompt(
         parts.append(f"Backstory: {persona.backstory}")
     if available_tools:
         parts.append(f"Available tools: {', '.join(available_tools)}")
+    if org_context:
+        parts.append(f"Org context: {org_context}")
     if world_context:
         parts.append(f"World context: {world_context}")
     return "\n".join(parts)

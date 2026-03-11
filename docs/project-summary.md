@@ -131,6 +131,7 @@ This produces genuine git history, real code diffs, and reviewable pull requests
 | **M4 — Enterprise Modeling & Roles** | Complete | Org chart, roles, responsibilities, inter-agent communication patterns |
 | **M5 — User Interface & Observability** | Complete | HTMX + SSE monitoring dashboard, agent status cards, simulation controls |
 | **M6 — End-to-End Scenarios & Testing** | Complete | Cost tracking with per-agent/global budget enforcement; regression test suite; performance benchmarks (throughput, latency p50/p95/p99, memory); scripted multi-agent scenarios (morning standup, customer escalation, campaign launch) |
+| **M7 — Usage Documentation** | Complete | Quickstart guide, configuration reference, platform adapter setup guides (Slack, GitHub, Gmail, X, LinkedIn), operator runbook, API/endpoint reference, architecture overview for contributors |
 
 ---
 

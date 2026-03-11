@@ -126,11 +126,11 @@ This produces genuine git history, real code diffs, and reviewable pull requests
 | Milestone | Status | Scope |
 |-----------|--------|-------|
 | **M1 — Analysis & Architecture** | Complete | Technology evaluation; all ADRs written and accepted |
-| **M2 — Core agent runtime** | Upcoming | Agent lifecycle, event bus, persona config, supervisor |
-| **M3 — Platform adapters** | Upcoming | X, Gmail, Slack, Reddit, GitHub, LinkedIn stub |
-| **M4 — RAG and knowledge base** | Upcoming | Qdrant setup, document ingestion, hybrid search |
-| **M5 — Coder agent integration** | Upcoming | Claude Agent SDK + E2B sandbox, cross-role PR workflow |
-| **M6 — Monitoring and deployment** | Upcoming | HTMX dashboard, Docker Compose production config, CI/CD |
+| **M2 — Core Platform & Agent Framework** | Complete | Agent lifecycle, event bus, LLM integration, persona config, supervisor, tool dispatcher |
+| **M3 — Platform Integrations** | Complete | Real adapters for Slack (`slack-sdk`), GitHub (`httpx`), Gmail (`google-api-python-client`), X/Twitter (`tweepy`); enhanced LinkedIn simulation; shared `PlatformClient` base with rate limiting and exponential backoff; factory auto-selects real vs stub based on credentials |
+| **M4 — Enterprise Modeling & Roles** | Complete | Org chart, roles, responsibilities, inter-agent communication patterns |
+| **M5 — User Interface & Observability** | Complete | HTMX + SSE monitoring dashboard, agent status cards, simulation controls |
+| **M6 — End-to-End Scenarios & Testing** | Complete | Cost tracking with per-agent/global budget enforcement; regression test suite; performance benchmarks (throughput, latency p50/p95/p99, memory); scripted multi-agent scenarios (morning standup, customer escalation, campaign launch) |
 
 ---
 

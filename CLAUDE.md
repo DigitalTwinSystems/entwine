@@ -17,13 +17,18 @@ Work style: telegraph; noun-phrases ok; drop grammar; min tokens.
 - Async runtime: asyncio (stdlib)
 - LLM integration: LiteLLM Router with Anthropic primary, OpenAI fallback (see ADR-002)
 
-## Code quality gates
+## Definition of Done
 
-Before completing any coding task, ALL must pass:
-- `uv run ruff check src/ tests/` — lint clean
-- `uv run ruff format --check src/ tests/` — format clean
-- `uv run pytest tests/ -q` — all tests green
-- Documentation up to date — ADRs, design.md, infrastructure.md reflect current state
+A task is **done** when ALL of the following hold:
+
+| Gate | Check |
+|------|-------|
+| Lint | `uv run ruff check src/ tests/` — zero errors |
+| Format | `uv run ruff format --check src/ tests/` — zero reformats |
+| Tests | `uv run pytest tests/ -q` — all green, no skips (except external-service integration) |
+| Coverage | New/changed code has tests; overall ≥80% (`--cov-fail-under=80`) |
+| Docs | ADRs, design.md, infrastructure.md, project-summary.md reflect current state |
+| Clean tree | `git status` shows no unstaged or untracked files (everything committed or git-ignored) |
 
 Write tests first or alongside code. No untested code merged.
 

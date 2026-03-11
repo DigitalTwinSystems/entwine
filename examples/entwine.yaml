@@ -7,6 +7,8 @@ simulation:
   tick_interval_seconds: 30
   max_ticks: 2880        # 24 h at 30-second ticks
   log_level: "INFO"
+  global_budget_usd: 50.0       # pause simulation at $50 total LLM cost
+  per_agent_budget_usd: 15.0    # per-agent cost cap
 
 enterprise:
   name: "Acme Corp"
@@ -32,7 +34,7 @@ agents:
       Serial entrepreneur with two successful exits in developer tooling.
       Strongly values data-driven decisions and tight product-market fit feedback loops.
       Prefers asynchronous communication but holds a daily 9 AM stand-up.
-    llm_tier: "premium"
+    llm_tier: "complex"
     tools:
       - draft_email
       - schedule_meeting
@@ -107,7 +109,7 @@ agents:
       Former backend developer who transitioned into support engineering.
       Combines technical depth with strong empathy for users. Maintains an
       internal knowledge base to speed up ticket resolution.
-    llm_tier: "fast"
+    llm_tier: "routine"
     tools:
       - draft_email
       - create_github_issue

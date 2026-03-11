@@ -1,6 +1,6 @@
 # entwine Infrastructure Specification
 
-**Last updated:** 2026-03-10
+**Last updated:** 2026-03-11
 **Authoritative ADR:** [ADR-007](adr/007-deployment-and-infrastructure.md)
 
 ---
@@ -219,9 +219,16 @@ CMD ["uv", "run", "entwine", "serve"]
 src/
 └── entwine/
     ├── __init__.py
-    ├── agents/        # asyncio agent coroutines, supervisor
+    ├── agents/        # BaseAgent, StandardAgent, CoderAgent, Supervisor
+    ├── cli/           # Typer CLI (start, validate)
     ├── config/        # Pydantic Settings, TOML/YAML loaders
+    ├── events/        # EventBus (asyncio pub/sub), typed event models
+    ├── llm/           # LLMRouter (LiteLLM), tier-based model dispatch
+    ├── observability/  # HookRegistry, MetricsCollector, CostTracker
+    ├── platforms/     # Platform adapters (real + stub), registry, factory
     ├── rag/           # Qdrant async client, hybrid search
+    ├── simulation/    # SimulationEngine, SimulationClock
+    ├── tools/         # ToolDispatcher, built-in tools
     └── web/           # FastAPI app, HTMX routes, SSE endpoints
 ```
 
@@ -325,43 +332,43 @@ IMAGE_TAG=${GITHUB_SHA::8} docker compose -f compose.yaml -f compose.prod.yaml u
 # ── LLM providers (required in prod; optional in dev — Ollama used instead) ──
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
+ENTWINE_LLM_ROUTINE_MODEL=anthropic/claude-haiku-4-5
+ENTWINE_LLM_STANDARD_MODEL=anthropic/claude-sonnet-4-6
+ENTWINE_LLM_COMPLEX_MODEL=anthropic/claude-opus-4-6
 
-# ── Platform OAuth tokens ──
-X_API_KEY=...
-X_API_SECRET=...
-X_ACCESS_TOKEN=...
-X_ACCESS_TOKEN_SECRET=...
+# ── Platform: Slack ──
+ENTWINE_SLACK_BOT_TOKEN=xoxb-...
+ENTWINE_SLACK_DEFAULT_CHANNEL=#general
 
-GMAIL_CLIENT_ID=...
-GMAIL_CLIENT_SECRET=...
-GMAIL_REFRESH_TOKEN=...
+# ── Platform: GitHub ──
+ENTWINE_GITHUB_TOKEN=ghp_...
+ENTWINE_GITHUB_OWNER=your-org
+ENTWINE_GITHUB_REPO=your-repo
 
-OFFICE365_TENANT_ID=...
-OFFICE365_CLIENT_ID=...
-OFFICE365_CLIENT_SECRET=...
+# ── Platform: Email (Gmail) ──
+ENTWINE_EMAIL_CREDENTIALS_JSON=credentials.json
+ENTWINE_EMAIL_TOKEN_JSON=token.json
+ENTWINE_EMAIL_USER_EMAIL=agent@company.com
 
-REDDIT_CLIENT_ID=...
-REDDIT_CLIENT_SECRET=...
-REDDIT_REFRESH_TOKEN=...
+# ── Platform: X (Twitter) ──
+ENTWINE_X_API_KEY=...
+ENTWINE_X_API_SECRET=...
+ENTWINE_X_ACCESS_TOKEN=...
+ENTWINE_X_ACCESS_TOKEN_SECRET=...
+ENTWINE_X_BEARER_TOKEN=...
 
-SLACK_BOT_TOKEN=xoxb-...
-
-GITHUB_APP_ID=...
-GITHUB_APP_PRIVATE_KEY_PATH=/run/secrets/github_app.pem
-
-# ── Qdrant (no auth in dev; required in prod) ──
-QDRANT_API_KEY=
+# ── Qdrant ──
+ENTWINE_QDRANT_URL=http://qdrant:6333
+RAG_COLLECTION_NAME=enterprise_knowledge
 
 # ── E2B (required only when coder agents are enabled — ADR-010) ──
 E2B_API_KEY=
 
-# ── Observability ──
-OTEL_SERVICE_NAME=entwine
-OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-
 # ── App settings ──
-LOG_LEVEL=INFO
+ENTWINE_LOG_LEVEL=INFO
 ```
+
+> **Note:** Platform adapters fall back to stubs (simulated mode) when credentials are absent. LinkedIn is always simulated per ADR-006.
 
 ### Pydantic Settings loading order
 
@@ -408,12 +415,14 @@ Do not use Doppler or HashiCorp Vault until team or secret count grows significa
 
 ### Signals
 
-| Signal | Tool | Config |
-|--------|------|--------|
-| Structured logs | `structlog` or `python-json-logger` → stdout → Docker log driver | `LOG_LEVEL` env var |
-| Traces | OpenTelemetry → Jaeger (dev) / OTLP endpoint (prod) | `OTEL_EXPORTER_OTLP_ENDPOINT` |
-| Metrics | `prometheus-fastapi-instrumentator` → Prometheus scrape | `/metrics` endpoint |
-| LLM cost | `litellm.completion_cost()` logged per request | Application layer |
+| Signal | Tool | Config | Status |
+|--------|------|--------|--------|
+| Structured logs | `structlog` → stdout (JSON) → Docker log driver | `LOG_LEVEL` env var | **Implemented** |
+| LLM cost | `CostTracker` per agent + global; `litellm.completion_cost()` per call | `global_budget_usd` / `per_agent_budget_usd` in config | **Implemented** |
+| Lifecycle hooks | `HookRegistry` for agent, LLM, tool events | In-process callbacks | **Implemented** |
+| In-memory metrics | `MetricsCollector` (calls, tokens, costs, errors by agent/tier) | `/status` endpoint | **Implemented** |
+| Traces | OpenTelemetry → Jaeger (dev) / OTLP endpoint (prod) | `OTEL_EXPORTER_OTLP_ENDPOINT` | Planned |
+| Metrics export | `prometheus-fastapi-instrumentator` → Prometheus scrape | `/metrics` endpoint | Planned |
 
 ### Structured logging
 

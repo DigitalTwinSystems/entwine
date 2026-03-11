@@ -1,6 +1,6 @@
 # entwine — System Design and Architecture
 
-**Date:** 2026-03-10
+**Date:** 2026-03-11
 
 This document synthesises ADR-001 through ADR-010 into a cohesive system design reference. See the individual ADRs in `docs/adr/` for full rationale behind each decision.
 
@@ -88,22 +88,43 @@ entwine is a digital twin platform that simulates SME operations using ~12 concu
 | Config model | `src/entwine/config/` | Pydantic Settings + TOML + YAML | ADR-004 |
 | Monitoring UI | `src/entwine/web/` | FastAPI + HTMX + sse-starlette | ADR-004 |
 | CLI | `src/entwine/` | typer | ADR-004 |
-| Coder sub-system | `src/entwine/agents/coder/` | Claude Agent SDK + E2B | ADR-010 |
-| Observability | Cross-cutting | structlog + OpenTelemetry + Prometheus | ADR-007 |
+| Coder sub-system | `src/entwine/agents/coder.py` | Claude Agent SDK + E2B (planned) | ADR-010 |
+| Cost tracking | `src/entwine/observability/cost_tracker.py` | Per-agent + global budget enforcement | — |
+| Observability | Cross-cutting | structlog (implemented); OpenTelemetry + Prometheus (planned) | ADR-007 |
 
 ### Package structure (ADR-008)
 
 ```
 src/entwine/
 ├── agents/
-│   ├── base.py          # AgentRuntime, lifecycle states, event loop
+│   ├── base.py          # BaseAgent: lifecycle states, event loop
+│   ├── standard.py      # StandardAgent: LLM + RAG + tool dispatch
+│   ├── coder.py         # CoderAgent (planned: Claude Agent SDK + E2B)
 │   ├── memory.py        # working context, short-term buffer, Qdrant writes
-│   ├── supervisor.py    # SimulationSupervisor
-│   ├── tools.py         # tool dispatcher
-│   └── coder/           # CoderAgent, E2B wiring, SDK hooks
+│   ├── models.py        # AgentPersona, AgentState, WorkingHours
+│   ├── prompts.py       # System prompt builder
+│   └── supervisor.py    # Supervisor: non-LLM lifecycle manager
 ├── config/              # Pydantic Settings, TOML/YAML loaders
-├── platforms/           # one module per platform adapter
+├── events/              # EventBus (asyncio pub/sub), typed event models
+├── llm/                 # LLMRouter (LiteLLM), tier-based model dispatch
+├── observability/       # HookRegistry, MetricsCollector, CostTracker
+├── platforms/
+│   ├── base.py          # PlatformAdapter ABC
+│   ├── client.py        # PlatformClient: shared HTTP + rate limiting + retries
+│   ├── factory.py       # build_platform_registry(): real vs stub per credentials
+│   ├── settings.py      # PlatformSettings (Slack, GitHub, Email, X credentials)
+│   ├── stubs.py         # Stub adapters (simulated fallback)
+│   ├── slack.py         # SlackLiveAdapter (slack-sdk)
+│   ├── github.py        # GitHubLiveAdapter (httpx)
+│   ├── email.py         # EmailLiveAdapter (Gmail google-api-python-client)
+│   ├── x.py             # XLiveAdapter (tweepy)
+│   ├── linkedin.py      # LinkedInSimAdapter (always simulated per ADR-006)
+│   └── registry.py      # PlatformRegistry: name → adapter lookup
 ├── rag/                 # Qdrant client, embedding calls, hybrid search
+├── simulation/
+│   ├── engine.py        # SimulationEngine: wires all subsystems, tick loop
+│   └── clock.py         # SimulationClock: simulation time control
+├── tools/               # ToolDispatcher, built-in tools, ToolCall/ToolResult models
 └── web/                 # FastAPI app, HTMX routes, SSE endpoint
 ```
 
@@ -390,6 +411,28 @@ All events flow over the existing `asyncio.Queue` bus — no new IPC mechanism.
 
 ---
 
+## 6.5 Cost Tracking and Budget Enforcement
+
+`CostTracker` (`src/entwine/observability/cost_tracker.py`) tracks cumulative LLM costs per agent and globally, with configurable budget limits.
+
+| Feature | Detail |
+|---|---|
+| Per-agent tracking | Cost, call count, input/output tokens per agent |
+| Global budget | `global_budget_usd` in `SimulationConfig`; simulation pauses when exceeded |
+| Per-agent budget | `per_agent_budget_usd`; raises `BudgetExceeded` per agent |
+| Status endpoint | `/status` includes full cost breakdown under `costs` key |
+| Wiring | `StandardAgent._call_llm()` records cost after each LLM response |
+
+Configuration:
+
+```yaml
+simulation:
+  global_budget_usd: 50.0      # pause simulation at $50 total
+  per_agent_budget_usd: 10.0   # per-agent cap
+```
+
+---
+
 ## 7. Configuration Model (ADR-004)
 
 Two complementary config file types, both validated by Pydantic Settings at startup:
@@ -467,12 +510,14 @@ All in Docker Compose. No message broker, no orchestrator.
 
 ### 8.4 Observability stack
 
-| Signal | Tool | Notes |
+| Signal | Tool | Status |
 |---|---|---|
-| Traces | OpenTelemetry → Jaeger (dev) / OTLP (prod) | Add early; backend is swappable |
-| Metrics | Prometheus + Grafana | Add when logs cannot answer the question |
-| Logs | structlog → stdout (JSON) → Docker log driver | Minimum viable from day one |
-| LLM cost | `litellm.completion_cost()` logged per call | Application layer; no extra infra |
+| Logs | structlog → stdout (JSON) → Docker log driver | **Implemented** |
+| LLM cost | `CostTracker` + `litellm.completion_cost()` per call; budget enforcement | **Implemented** |
+| Lifecycle hooks | `HookRegistry` for agent/LLM/tool events | **Implemented** |
+| In-memory metrics | `MetricsCollector` (LLM calls, tokens, costs, errors) | **Implemented** |
+| Traces | OpenTelemetry → Jaeger (dev) / OTLP (prod) | Planned |
+| Metrics export | Prometheus + Grafana | Planned |
 
 ### 8.5 Secrets
 

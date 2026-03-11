@@ -8,4 +8,4 @@ Create a digital twin of a small-to-medium enterprise (up to ~12 employees) wher
 
 ## Status
 
-**Phase: Analysis & Architecture** — Evaluating technologies, architecture patterns, and interaction models.
+**All milestones complete.** Core agent runtime, platform integrations (Slack, GitHub, Gmail, X, LinkedIn-simulated), cost tracking with budget enforcement, end-to-end scenario tests, and performance benchmarks are implemented. See [`docs/project-summary.md`](docs/project-summary.md) for details.

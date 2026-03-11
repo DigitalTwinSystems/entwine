@@ -13,6 +13,7 @@ from entwine.agents.prompts import assemble_messages, build_system_prompt
 from entwine.events.models import Event
 from entwine.llm.models import CompletionResponse, LLMTier
 from entwine.llm.router import LLMRouter
+from entwine.observability.cost_tracker import CostTracker
 from entwine.rag.models import SearchResult
 from entwine.rag.store import KnowledgeStore
 from entwine.tools.dispatcher import ToolDispatcher
@@ -45,6 +46,7 @@ class StandardAgent(BaseAgent):
         llm_router: LLMRouter | None = None,
         knowledge_store: KnowledgeStore | None = None,
         tool_dispatcher: ToolDispatcher | None = None,
+        cost_tracker: CostTracker | None = None,
         world_context: str = "",
         tick_interval: float = 0.05,
     ) -> None:
@@ -52,6 +54,7 @@ class StandardAgent(BaseAgent):
         self._llm_router = llm_router
         self._knowledge_store = knowledge_store
         self._tool_dispatcher = tool_dispatcher
+        self._cost_tracker = cost_tracker
         self._world_context = world_context
 
     # ------------------------------------------------------------------
@@ -116,6 +119,19 @@ class StandardAgent(BaseAgent):
         except Exception:
             log.exception("standard_agent.llm_error", agent=self.name)
             return None
+
+        # Record cost if tracker is available.
+        if self._cost_tracker is not None:
+            try:
+                self._cost_tracker.record(
+                    agent_name=self.name,
+                    cost_usd=response.cost_usd,
+                    input_tokens=response.input_tokens,
+                    output_tokens=response.output_tokens,
+                )
+            except Exception:
+                log.warning("standard_agent.budget_exceeded", agent=self.name)
+
         log.debug(
             "standard_agent.llm_response",
             agent=self.name,

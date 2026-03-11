@@ -14,6 +14,10 @@ class SimulationConfig(BaseModel):
     tick_interval_seconds: float = Field(default=60.0, gt=0)
     max_ticks: int | None = Field(default=None, gt=0)
     log_level: str = Field(default="INFO")
+    global_budget_usd: float | None = Field(default=None, description="Max total LLM cost (USD).")
+    per_agent_budget_usd: float | None = Field(
+        default=None, description="Max LLM cost per agent (USD)."
+    )
 
 
 class DepartmentConfig(BaseModel):

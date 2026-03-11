@@ -14,6 +14,7 @@ from entwine.agents.supervisor import Supervisor
 from entwine.config.models import FullConfig
 from entwine.events.bus import EventBus
 from entwine.events.models import SystemEvent, TaskAssigned
+from entwine.observability.cost_tracker import CostTracker
 from entwine.platforms.factory import build_platform_registry
 from entwine.platforms.registry import PlatformRegistry
 from entwine.simulation.clock import SimulationClock
@@ -112,6 +113,10 @@ class SimulationEngine:
         )
         self._tool_dispatcher = _build_tool_dispatcher()
         self._platform_registry = _build_platform_registry()
+        self._cost_tracker = CostTracker(
+            global_budget=config.simulation.global_budget_usd,
+            per_agent_budget=config.simulation.per_agent_budget_usd,
+        )
 
         # Shared mutable world state protected by an asyncio lock.
         self._world_state: dict[str, Any] = {}
@@ -151,6 +156,7 @@ class SimulationEngine:
                 event_bus=queue,
                 llm_router=self._llm_router,
                 tool_dispatcher=self._tool_dispatcher,
+                cost_tracker=self._cost_tracker,
                 tick_interval=0.05,
             )
             # Wire up the typed EventBus for pub/sub routing.
@@ -255,6 +261,11 @@ class SimulationEngine:
     # Status
     # ------------------------------------------------------------------
 
+    @property
+    def cost_tracker(self) -> CostTracker:
+        """Return the cost tracker instance."""
+        return self._cost_tracker
+
     def get_status(self) -> dict[str, Any]:
         """Return a snapshot of the simulation status."""
         return {
@@ -274,6 +285,7 @@ class SimulationEngine:
                 "is_running": self._clock.is_running,
             },
             "platforms": self._platform_registry.list_platforms(),
+            "costs": self._cost_tracker.snapshot(),
         }
 
     # ------------------------------------------------------------------
@@ -301,6 +313,15 @@ class SimulationEngine:
                     },
                 )
             )
+
+            if self._cost_tracker.budget_exceeded:
+                log.warning(
+                    "engine.budget_exceeded",
+                    scope=self._cost_tracker.budget_exceeded_scope,
+                    cost=self._cost_tracker.global_cost,
+                )
+                await self.pause()
+                break
 
             if max_ticks is not None and self._clock.elapsed_ticks >= max_ticks:
                 log.info("engine.max_ticks_reached", ticks=self._clock.elapsed_ticks)

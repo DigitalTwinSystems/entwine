@@ -50,6 +50,19 @@ class TestBuildSystemPrompt:
         assert "Q1 budget approved" in prompt
         assert "World context" in prompt
 
+    def test_with_org_context(self) -> None:
+        persona = make_persona()
+        prompt = build_system_prompt(
+            persona, org_context="Reports to: CEO; Direct reports: Designer, Analyst"
+        )
+        assert "Org context" in prompt
+        assert "Reports to: CEO" in prompt
+
+    def test_omits_empty_org_context(self) -> None:
+        persona = make_persona()
+        prompt = build_system_prompt(persona, org_context="")
+        assert "Org context" not in prompt
+
     def test_omits_empty_optional_fields(self) -> None:
         persona = make_persona(department="", backstory="")
         prompt = build_system_prompt(persona)

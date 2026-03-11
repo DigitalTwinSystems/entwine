@@ -457,7 +457,7 @@ agents:
     llm_tier: complex
     working_hours: "07:00-20:00"
     rag_access: [company-wide]
-    tools: [delegate_task, read_metrics, post_to_slack]
+    tools: [delegate_task, read_company_metrics, post_to_slack]
 
   - id: coder_alice
     type: coder                  # activates coder subsystem (ADR-010)

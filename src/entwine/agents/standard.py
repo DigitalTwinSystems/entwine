@@ -91,6 +91,7 @@ class StandardAgent(BaseAgent):
             self._persona,
             available_tools=self._persona.tools or None,
             world_context=self._world_context,
+            org_context=getattr(self, "_org_context", ""),
         )
 
         rag_strings = [r.document.content for r in rag_results if isinstance(r, SearchResult)]

@@ -5,7 +5,20 @@ from __future__ import annotations
 import pytest
 
 from entwine.tools import ToolCall, ToolDispatcher, ToolResult
-from entwine.tools.builtin import delegate_task, query_knowledge, read_metrics
+from entwine.tools.builtin import (
+    create_github_issue,
+    create_pr,
+    delegate_task,
+    draft_email,
+    post_to_linkedin,
+    post_to_slack,
+    post_to_x,
+    query_knowledge,
+    read_company_metrics,
+    read_crm,
+    schedule_meeting,
+    update_crm_ticket,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -214,7 +227,64 @@ class TestBuiltinTools:
         assert "analyst" in result
 
     @pytest.mark.asyncio
-    async def test_read_metrics_returns_string(self) -> None:
-        result = await read_metrics()
+    async def test_read_company_metrics_returns_string(self) -> None:
+        result = await read_company_metrics()
         assert isinstance(result, str)
         assert "Metrics" in result
+
+    @pytest.mark.asyncio
+    async def test_schedule_meeting(self) -> None:
+        result = await schedule_meeting(
+            attendees="Alice, Bob", time="10:00", agenda="Sprint review"
+        )
+        assert "10:00" in result
+        assert "Alice, Bob" in result
+
+    @pytest.mark.asyncio
+    async def test_draft_email(self) -> None:
+        result = await draft_email(to="alice@acme.com", subject="Update", body="Here's the update.")
+        assert "alice@acme.com" in result
+        assert "Update" in result
+
+    @pytest.mark.asyncio
+    async def test_post_to_slack(self) -> None:
+        result = await post_to_slack(channel="#general", message="Hello team")
+        assert "#general" in result
+
+    @pytest.mark.asyncio
+    async def test_post_to_linkedin(self) -> None:
+        result = await post_to_linkedin(content="Exciting product launch!")
+        assert "LinkedIn" in result
+
+    @pytest.mark.asyncio
+    async def test_post_to_x(self) -> None:
+        result = await post_to_x(content="New release out now!")
+        assert "X" in result
+
+    @pytest.mark.asyncio
+    async def test_create_github_issue(self) -> None:
+        result = await create_github_issue(title="Bug fix", body="Fix the auth bug", labels="bug")
+        assert "Bug fix" in result
+        assert "bug" in result
+
+    @pytest.mark.asyncio
+    async def test_create_pr(self) -> None:
+        result = await create_pr(title="Add feature", body="New feature", branch="feat/new")
+        assert "feat/new" in result
+
+    @pytest.mark.asyncio
+    async def test_read_crm(self) -> None:
+        result = await read_crm(query="enterprise deals")
+        assert "enterprise deals" in result
+
+    @pytest.mark.asyncio
+    async def test_update_crm_ticket(self) -> None:
+        result = await update_crm_ticket(ticket_id="T-123", status="resolved", note="Fixed")
+        assert "T-123" in result
+        assert "resolved" in result
+
+    @pytest.mark.asyncio
+    async def test_update_crm_ticket_without_note(self) -> None:
+        result = await update_crm_ticket(ticket_id="T-456", status="open")
+        assert "T-456" in result
+        assert "note" not in result

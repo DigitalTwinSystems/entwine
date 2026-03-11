@@ -25,6 +25,15 @@ class DepartmentConfig(BaseModel):
 
     name: str
     description: str = ""
+    head: str = ""
+    members: list[str] = Field(default_factory=list)
+
+
+class ReportingLine(BaseModel):
+    """A manager-subordinate reporting relationship."""
+
+    subordinate: str
+    manager: str
 
 
 class EnterpriseConfig(BaseModel):
@@ -33,6 +42,10 @@ class EnterpriseConfig(BaseModel):
     name: str
     description: str = ""
     departments: list[DepartmentConfig] = Field(default_factory=list)
+    reporting_lines: list[ReportingLine] = Field(default_factory=list)
+    cross_department_channels: list[str] = Field(
+        default_factory=lambda: ["email", "slack"],
+    )
 
 
 class FullConfig(BaseModel):

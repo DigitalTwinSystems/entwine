@@ -12,8 +12,10 @@ from entwine.agents.models import WorkingHours
 from entwine.config.loader import load_config
 from entwine.config.models import (
     AgentPersona,
+    DepartmentConfig,
     EnterpriseConfig,
     FullConfig,
+    ReportingLine,
     SimulationConfig,
 )
 
@@ -330,6 +332,43 @@ def test_enterprise_config_defaults() -> None:
     ent = EnterpriseConfig(name="Corp")
     assert ent.description == ""
     assert ent.departments == []
+    assert ent.reporting_lines == []
+    assert ent.cross_department_channels == ["email", "slack"]
+
+
+def test_department_config_with_hierarchy() -> None:
+    """DepartmentConfig accepts head and members fields."""
+    dept = DepartmentConfig(name="Engineering", head="Alice", members=["Alice", "Bob"])
+    assert dept.head == "Alice"
+    assert dept.members == ["Alice", "Bob"]
+
+
+def test_department_config_defaults() -> None:
+    """DepartmentConfig hierarchy fields default to empty."""
+    dept = DepartmentConfig(name="Sales")
+    assert dept.head == ""
+    assert dept.members == []
+
+
+def test_reporting_line_model() -> None:
+    """ReportingLine captures subordinate-manager relationship."""
+    line = ReportingLine(subordinate="Bob", manager="Alice")
+    assert line.subordinate == "Bob"
+    assert line.manager == "Alice"
+
+
+def test_enterprise_with_reporting_lines() -> None:
+    """EnterpriseConfig accepts reporting_lines list."""
+    ent = EnterpriseConfig(
+        name="Corp",
+        reporting_lines=[
+            ReportingLine(subordinate="Bob", manager="Alice"),
+            ReportingLine(subordinate="Carol", manager="Alice"),
+        ],
+        cross_department_channels=["slack"],
+    )
+    assert len(ent.reporting_lines) == 2
+    assert ent.cross_department_channels == ["slack"]
 
 
 # ---------------------------------------------------------------------------
@@ -344,6 +383,6 @@ def test_example_config_loads() -> None:
         pytest.skip("examples/entwine.yaml not present")
 
     config = load_config(example_path)
-    assert len(config.agents) >= 3
+    assert len(config.agents) >= 12
     assert config.simulation.name
     assert config.enterprise.name

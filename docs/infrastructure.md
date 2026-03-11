@@ -137,28 +137,18 @@ volumes:
 
 ### `compose.prod.yaml` (production overlay)
 
-```yaml
-services:
-  entwine:
-    image: ghcr.io/digitaltwinsystems/entwine:${IMAGE_TAG:-latest}
-    build: !reset null            # never build in prod
-    deploy:
-      resources:
-        limits:
-          cpus: "2"
-          memory: 4G
-    environment:
-      - LOG_LEVEL=INFO
-      - OTEL_TRACES_EXPORTER=otlp
+Adds security hardening, resource limits, Caddy TLS proxy.
 
-  qdrant:
-    environment:
-      - QDRANT__SERVICE__API_KEY=${QDRANT_API_KEY}
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-```
+| Feature | Detail |
+|---------|--------|
+| Image tag | `${IMAGE_TAG:-latest}` — set by deploy workflow |
+| Ports | `127.0.0.1:8000` only (Caddy fronts on 80/443) |
+| Security | `read_only: true`, `tmpfs: /tmp`, `no-new-privileges` |
+| Resources | entwine: 2 CPU / 4G; qdrant: 1 CPU / 2G |
+| Logging | json-file, 50m x 5 on all services |
+| Caddy | TLS termination, SSE support, static asset caching |
+
+See `compose.prod.yaml` and `Caddyfile` for full source.
 
 ### Service port summary
 
@@ -174,42 +164,43 @@ services:
 
 ## 3. Container Specification
 
-Single-stage build on `python:3.12-slim` ([best practices](https://docs.docker.com/build/building/best-practices/)). No multi-stage build — no compiled extensions at this stage (ADR-007).
+Multi-stage build on `python:3.12-slim` ([best practices](https://docs.docker.com/build/building/best-practices/)). Builder stage installs deps; runtime stage copies only the venv.
 
 ### `Dockerfile`
 
 ```dockerfile
-FROM python:3.12-slim
-
+# ── Stage 1: builder ──
+FROM python:3.12-slim AS builder
 WORKDIR /app
-
-# Install uv — layer cached until this step changes
-RUN pip install uv
-
-# Copy dependency manifests first to maximize cache hits
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 COPY pyproject.toml uv.lock ./
-
-# Install runtime dependencies only (no dev extras)
 RUN uv sync --no-dev --frozen
 
-# Copy application source
+# ── Stage 2: runtime ──
+FROM python:3.12-slim
+LABEL org.opencontainers.image.source="https://github.com/DigitalTwinSystems/entwine"
+LABEL org.opencontainers.image.description="LLM-powered enterprise digital twin simulation"
+LABEL org.opencontainers.image.licenses="MIT"
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/.venv /app/.venv
 COPY src/ ./src/
-
-# Non-root user
+COPY pyproject.toml ./
 RUN useradd -m entwine && chown -R entwine /app
 USER entwine
-
+ENV PATH="/app/.venv/bin:$PATH"
 EXPOSE 8000
-
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
-
-CMD ["uv", "run", "entwine", "serve"]
+CMD ["uvicorn", "entwine.web.app:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 ### Build notes
 
-- In CI, pin base image to a digest (`python:3.12-slim@sha256:...`) for supply-chain integrity.
+- uv installed via `COPY --from=ghcr.io/astral-sh/uv:latest` — faster than `pip install`.
+- Multi-stage: builder installs deps, runtime copies only `.venv`. Smaller final image.
+- OCI labels for GHCR metadata.
+- `.dockerignore` excludes `.git`, `tests/`, `docs/`, `.env*`, etc.
 - Layer order: system deps → `uv` → lockfile copy → `uv sync` → source copy. Source changes only invalidate the last layer.
 - `uv sync --frozen` enforces the lockfile; fails if `uv.lock` is out of date.
 
@@ -497,82 +488,28 @@ Minimum viable observability for a single VM: structured logs only. Add Promethe
 
 Three GitHub Actions workflows. All run on `ubuntu-latest`. No self-hosted runners.
 
-### `ci.yml` — lint, type-check, test (push / PR to any branch)
+### `ci.yml` — lint + test (push to main / PR)
 
-```yaml
-name: CI
+Three parallel jobs: `lint`, `test` (Python 3.12 + 3.13 matrix), `validate-config`.
 
-on:
-  push:
-  pull_request:
+- Lint: ruff check + format
+- Test: pytest with `--cov-fail-under=80`, coverage XML uploaded as artifact (3.12 only)
+- Validate-config: loads example YAML to catch config regressions
 
-jobs:
-  ci:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+See `.github/workflows/ci.yml` for full source.
 
-      - uses: astral-sh/setup-uv@v5
-        with:
-          version: "latest"
-          python-version: "3.12"
+### `publish.yml` — build and push Docker image (push to main / tags)
 
-      - name: Install dependencies
-        run: uv sync --frozen
+Multi-arch (amd64 + arm64) build via Docker Buildx + QEMU. Tags:
 
-      - name: Lint
-        run: uv run ruff check src/ tests/
+| Trigger | Tags |
+|---------|------|
+| Push to main | `latest`, `sha-<commit>` |
+| Tag `v1.2.3` | `1.2.3`, `1.2`, `sha-<commit>` |
 
-      - name: Format check
-        run: uv run ruff format --check src/ tests/
+Uses `docker/metadata-action` for tag generation, registry cache for fast rebuilds.
 
-      - name: Type-check
-        run: uv run mypy src/
-
-      - name: Unit tests
-        run: uv run pytest -m "not integration" --cov=src/entwine --cov-fail-under=80
-```
-
-### `build.yml` — build and push Docker image (push to `main`)
-
-```yaml
-name: Build
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: |
-            ghcr.io/digitaltwinsystems/entwine:latest
-            ghcr.io/digitaltwinsystems/entwine:${{ github.sha }}
-          cache-from: type=registry,ref=ghcr.io/digitaltwinsystems/entwine:latest
-          cache-to: type=inline
-```
+See `.github/workflows/publish.yml` for full source.
 
 ### `deploy.yml` — deploy to VM (manual dispatch or tag `v*`)
 

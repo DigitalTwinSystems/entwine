@@ -107,6 +107,35 @@ All tests: `uv run pytest tests/ -q`
 | Docs current | ADRs, design.md, infrastructure.md reflect changes |
 | Clean tree | `git status` shows no unstaged changes |
 
+## Pre-commit hooks
+
+Install hooks after cloning:
+
+```bash
+uv run pre-commit install
+```
+
+| Hook | Stage | Purpose |
+|------|-------|---------|
+| ruff (check + format) | pre-commit | Lint + format on every commit |
+| trailing-whitespace, end-of-file-fixer | pre-commit | Whitespace hygiene |
+| check-toml, check-yaml | pre-commit | Config file syntax |
+| check-merge-conflict | pre-commit | Catch unresolved markers |
+| check-added-large-files | pre-commit | Block files > 500 KB |
+| mypy | manual | Type-check (slow; run explicitly) |
+
+Run all hooks on the full repo:
+
+```bash
+uv run pre-commit run --all-files
+```
+
+Run mypy manually:
+
+```bash
+uv run pre-commit run --hook-stage manual mypy --all-files
+```
+
 ## Code style
 
 - **Formatter/linter**: ruff (line-length 100, target py312)

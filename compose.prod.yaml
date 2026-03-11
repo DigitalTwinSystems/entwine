@@ -1,7 +1,14 @@
 services:
   entwine:
-    image: ghcr.io/digitaltwinsystems/entwine:latest
+    image: ghcr.io/digitaltwinsystems/entwine:${IMAGE_TAG:-latest}
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
     deploy:
       resources:
         limits:
@@ -15,16 +22,48 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+    environment:
+      - LOG_LEVEL=INFO
 
   qdrant:
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     deploy:
       resources:
         limits:
           cpus: "1.0"
           memory: 2G
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
     volumes:
       - qdrant_data:/qdrant/storage
 
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - entwine-net
+    depends_on:
+      entwine:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
 volumes:
   qdrant_data:
+  caddy_data:
+  caddy_config:

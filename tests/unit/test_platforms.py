@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.util
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -380,7 +381,10 @@ class TestGitHubLiveAdapter:
 # Slack Live Adapter (unit, mocked SDK)
 # ---------------------------------------------------------------------------
 
+_has_slack_sdk = importlib.util.find_spec("slack_sdk") is not None
 
+
+@pytest.mark.skipif(not _has_slack_sdk, reason="slack_sdk not installed")
 class TestSlackLiveAdapter:
     def _make_adapter(self) -> PlatformAdapter:
         from entwine.platforms.slack import SlackLiveAdapter

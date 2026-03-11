@@ -1,0 +1,31 @@
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (default: latest)"
+        default: "latest"
+  push:
+    tags: ["v*"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            cd /opt/entwine
+            git pull origin main
+            IMAGE_TAG=${{ inputs.image_tag || github.sha }} \
+              docker compose -f compose.yaml -f compose.prod.yaml pull
+            IMAGE_TAG=${{ inputs.image_tag || github.sha }} \
+              docker compose -f compose.yaml -f compose.prod.yaml up -d
+            docker system prune -f

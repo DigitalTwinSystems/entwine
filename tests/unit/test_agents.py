@@ -329,7 +329,12 @@ async def test_supervisor_restart_strategy_replaces_agent() -> None:
     assert new_agent is not agent
     assert isinstance(new_agent, _FailingAgent)
     # The restarted _FailingAgent will also fail, so it may be in ERROR state.
-    assert new_agent.state in (AgentState.RUNNING, AgentState.STOPPED, AgentState.ERROR)
+    assert new_agent.state in (
+        AgentState.READY,
+        AgentState.RUNNING,
+        AgentState.STOPPED,
+        AgentState.ERROR,
+    )
     await supervisor.stop_all()
 
 

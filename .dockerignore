@@ -1,0 +1,15 @@
+.git
+.github
+.claude
+.venv
+__pycache__
+tests/
+docs/
+examples/
+*.md
+.env*
+.pre-commit-config.yaml
+.coverage
+htmlcov/
+dist/
+build/

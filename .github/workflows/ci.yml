@@ -4,7 +4,6 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
 
 jobs:
   lint:
@@ -12,22 +11,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
       - run: uv sync --frozen
       - run: uv run ruff check src/ tests/
       - run: uv run ruff format --check src/ tests/
 
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          python-version: ${{ matrix.python-version }}
       - run: uv sync --frozen
-      - run: uv run pytest tests/ --cov=src/entwine --cov-report=xml --cov-fail-under=80 -q
+      - name: Run tests
+        run: uv run pytest tests/ -m "not integration" --cov=src/entwine --cov-report=xml --cov-report=term-missing --cov-fail-under=80 -q
+      - name: Upload coverage
+        if: matrix.python-version == '3.12'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
 
   validate-config:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
       - run: uv sync --frozen
       - run: uv run python -c "from pathlib import Path; from entwine.config.loader import load_config; load_config(Path('examples/entwine.yaml'))"

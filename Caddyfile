@@ -1,0 +1,21 @@
+{$DOMAIN:localhost} {
+    reverse_proxy entwine:8000
+
+    @static path /static/*
+    handle @static {
+        header Cache-Control "public, max-age=86400"
+        reverse_proxy entwine:8000
+    }
+
+    @sse path /events/*
+    handle @sse {
+        reverse_proxy entwine:8000 {
+            flush_interval -1
+        }
+    }
+
+    log {
+        output stdout
+        format json
+    }
+}

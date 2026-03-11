@@ -106,6 +106,49 @@ def validate(
 
 
 @app.command()
+def ingest(
+    directory: Path = typer.Argument(
+        ...,
+        help="Directory containing knowledge base documents (.md, .txt, .rst).",
+        exists=True,
+        file_okay=False,
+        dir_okay=True,
+    ),
+    chunk_size: int = typer.Option(
+        500,
+        "--chunk-size",
+        help="Maximum characters per chunk.",
+        show_default=True,
+    ),
+    chunk_overlap: int = typer.Option(
+        100,
+        "--chunk-overlap",
+        help="Character overlap between consecutive chunks.",
+        show_default=True,
+    ),
+) -> None:
+    """Ingest documents from a directory into the Qdrant knowledge store."""
+    import asyncio
+
+    from entwine.rag.pipeline import ingest_directory
+    from entwine.rag.store import KnowledgeStore
+
+    async def _run() -> int:
+        store = KnowledgeStore()
+        await store.init_collection()
+        return await ingest_directory(
+            directory,
+            store,
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+        )
+
+    typer.echo(f"Ingesting documents from {directory} ...")
+    total = asyncio.run(_run())
+    typer.echo(f"Done. Ingested {total} document chunks.")
+
+
+@app.command()
 def version(
     short: bool = typer.Option(
         False,

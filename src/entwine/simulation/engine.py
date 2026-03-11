@@ -30,6 +30,7 @@ from entwine.tools.builtin import (
     read_company_metrics,
     read_crm,
     schedule_meeting,
+    set_knowledge_store,
     update_crm_ticket,
 )
 from entwine.tools.dispatcher import ToolDispatcher
@@ -253,6 +254,14 @@ class SimulationEngine:
         # Shared mutable world state protected by an asyncio lock.
         self._world_state: dict[str, Any] = {}
         self._world_state_lock = asyncio.Lock()
+
+        # Wire KnowledgeStore for query_knowledge tool (best-effort).
+        try:
+            from entwine.rag.store import KnowledgeStore as _KS
+
+            set_knowledge_store(_KS())
+        except Exception:
+            pass
 
         # Build agents from config.
         self._agents = self._create_agents(config.agents)

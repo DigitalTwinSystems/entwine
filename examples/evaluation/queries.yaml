@@ -1,0 +1,84 @@
+# Retrieval evaluation dataset — 20 queries with expected relevant documents.
+# doc IDs are based on the source filename stem (e.g. "company-handbook").
+# Used by tests/unit/test_rag_evaluation.py
+
+queries:
+  - query: "What is Acme Corp's PTO policy?"
+    relevant_docs: ["company-handbook"]
+    role: "company-wide"
+
+  - query: "What tech stack does engineering use?"
+    relevant_docs: ["engineering-playbook"]
+    role: "developer"
+
+  - query: "How do I set up my laptop on day one?"
+    relevant_docs: ["onboarding-guide"]
+    role: "company-wide"
+
+  - query: "What is the git branching strategy?"
+    relevant_docs: ["engineering-playbook"]
+    role: "developer"
+
+  - query: "What are the Q2 product priorities?"
+    relevant_docs: ["product-roadmap-q2"]
+    role: "ceo"
+
+  - query: "Who owns the Unified Search feature?"
+    relevant_docs: ["product-roadmap-q2"]
+    role: "product manager"
+
+  - query: "What is our pricing model?"
+    relevant_docs: ["sales-playbook"]
+    role: "sales representative"
+
+  - query: "How do I handle authentication failures?"
+    relevant_docs: ["support-runbook"]
+    role: "customer support engineer"
+
+  - query: "What content is planned for April?"
+    relevant_docs: ["marketing-content-calendar"]
+    role: "head of marketing"
+
+  - query: "What is the on-call rotation process?"
+    relevant_docs: ["engineering-playbook"]
+    role: "devops"
+
+  - query: "What are the company values?"
+    relevant_docs: ["company-handbook"]
+    role: "company-wide"
+
+  - query: "What is the ideal customer profile for sales?"
+    relevant_docs: ["sales-playbook"]
+    role: "sales representative"
+
+  - query: "How do I escalate a P0 customer issue?"
+    relevant_docs: ["support-runbook"]
+    role: "customer support engineer"
+
+  - query: "What are the deployment steps for production?"
+    relevant_docs: ["engineering-playbook"]
+    role: "devops"
+
+  - query: "What is the marketing KPI for blog traffic?"
+    relevant_docs: ["marketing-content-calendar"]
+    role: "head of marketing"
+
+  - query: "When is the SOC 2 docs freeze?"
+    relevant_docs: ["product-roadmap-q2"]
+    role: "ceo"
+
+  - query: "How do I handle the 'too expensive' sales objection?"
+    relevant_docs: ["sales-playbook"]
+    role: "sales representative"
+
+  - query: "What Slack channels should new employees join?"
+    relevant_docs: ["onboarding-guide"]
+    role: "company-wide"
+
+  - query: "What is the code review turnaround time?"
+    relevant_docs: ["engineering-playbook"]
+    role: "developer"
+
+  - query: "Who are the key contacts for new hires?"
+    relevant_docs: ["onboarding-guide"]
+    role: "company-wide"

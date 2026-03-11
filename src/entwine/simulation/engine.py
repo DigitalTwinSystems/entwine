@@ -14,14 +14,8 @@ from entwine.agents.supervisor import Supervisor
 from entwine.config.models import FullConfig
 from entwine.events.bus import EventBus
 from entwine.events.models import SystemEvent, TaskAssigned
+from entwine.platforms.factory import build_platform_registry
 from entwine.platforms.registry import PlatformRegistry
-from entwine.platforms.stubs import (
-    EmailAdapter,
-    GitHubAdapter,
-    LinkedInAdapter,
-    SlackAdapter,
-    XAdapter,
-)
 from entwine.simulation.clock import SimulationClock
 from entwine.tools.builtin import delegate_task, query_knowledge, read_metrics
 from entwine.tools.dispatcher import ToolDispatcher
@@ -86,11 +80,8 @@ def _build_tool_dispatcher() -> ToolDispatcher:
 
 
 def _build_platform_registry() -> PlatformRegistry:
-    """Create a PlatformRegistry with all stub adapters registered."""
-    registry = PlatformRegistry()
-    for adapter_cls in (XAdapter, LinkedInAdapter, GitHubAdapter, EmailAdapter, SlackAdapter):
-        registry.register(adapter_cls())
-    return registry
+    """Create a PlatformRegistry with best-available adapters (real or stub)."""
+    return build_platform_registry()
 
 
 def _is_coder_persona(persona: AgentPersona) -> bool:

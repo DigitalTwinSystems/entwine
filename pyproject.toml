@@ -18,6 +18,17 @@ dependencies = [
     "httpx>=0.28",
 ]
 
+[project.optional-dependencies]
+slack = ["slack-sdk>=3.33"]
+github = []  # uses httpx (core dep)
+email = ["google-api-python-client>=2.160", "google-auth-oauthlib>=1.2"]
+x = ["tweepy>=4.14"]
+platforms = [
+    "entwine[slack]",
+    "entwine[email]",
+    "entwine[x]",
+]
+
 [project.scripts]
 entwine = "entwine.cli.main:app"
 

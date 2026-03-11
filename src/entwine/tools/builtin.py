@@ -2,6 +2,20 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from entwine.rag.store import KnowledgeStore
+
+# Optional KnowledgeStore instance — set by SimulationEngine when available.
+_knowledge_store: KnowledgeStore | None = None
+
+
+def set_knowledge_store(store: KnowledgeStore) -> None:
+    """Wire the global knowledge store for query_knowledge to use."""
+    global _knowledge_store
+    _knowledge_store = store
+
 
 async def delegate_task(recipient: str, task_description: str, priority: str = "normal") -> str:
     """Delegate a task to another agent."""
@@ -9,7 +23,23 @@ async def delegate_task(recipient: str, task_description: str, priority: str = "
 
 
 async def query_knowledge(query: str, role: str) -> str:
-    """Query the knowledge base for information relevant to a role."""
+    """Query the knowledge base for information relevant to a role.
+
+    Uses the real KnowledgeStore when available, falls back to a stub response.
+    """
+    if _knowledge_store is not None:
+        try:
+            results = await _knowledge_store.search(query=query, agent_role=role, limit=5)
+            if results:
+                snippets = [
+                    f"[{r.document.metadata.get('source_file', 'unknown')}] "
+                    f"{r.document.content[:200]}"
+                    for r in results
+                ]
+                return f"Knowledge results ({len(results)} docs):\n" + "\n---\n".join(snippets)
+            return f"No knowledge base results found for '{query}' (role={role})"
+        except Exception:
+            pass
     return f"Knowledge results for role={role}: synthetic answer for '{query}'"
 
 

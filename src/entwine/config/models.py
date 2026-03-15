@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from entwine.agents.models import AgentPersona
+from entwine.rag.settings import RAGSettings
 
 
 class SimulationConfig(BaseModel):
@@ -17,6 +18,9 @@ class SimulationConfig(BaseModel):
     global_budget_usd: float | None = Field(default=None, description="Max total LLM cost (USD).")
     per_agent_budget_usd: float | None = Field(
         default=None, description="Max LLM cost per agent (USD)."
+    )
+    max_coder_agents: int = Field(
+        default=2, gt=0, description="Max concurrent coder agent sessions."
     )
 
 
@@ -54,3 +58,4 @@ class FullConfig(BaseModel):
     simulation: SimulationConfig
     enterprise: EnterpriseConfig
     agents: list[AgentPersona] = Field(default_factory=list)
+    rag: RAGSettings | None = Field(default=None)

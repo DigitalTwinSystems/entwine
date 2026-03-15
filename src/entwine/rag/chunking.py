@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import uuid
 
 from entwine.rag.models import Document
 
@@ -67,14 +66,16 @@ def chunks_to_documents(
     """Convert text chunks into Document objects with metadata and content-hash IDs."""
     docs: list[Document] = []
     for i, chunk in enumerate(chunks):
-        doc_id = content_hash(chunk) if source_id else str(uuid.uuid4())
+        chunk_hash = content_hash(chunk)
         if source_id:
-            doc_id = f"{source_id}:chunk-{i}:{doc_id[:12]}"
+            doc_id = f"{source_id}:chunk-{i}:{chunk_hash[:12]}"
+        else:
+            doc_id = f"chunk-{i}:{chunk_hash[:12]}"
         docs.append(
             Document(
                 id=doc_id,
                 content=chunk,
-                metadata={**metadata, "chunk_index": i},
+                metadata={**metadata, "chunk_index": i, "content_hash": chunk_hash},
             )
         )
     return docs

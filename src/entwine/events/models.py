@@ -54,6 +54,30 @@ class AgentStateChanged(Event):
     event_type: str = "agent_state_changed"
 
 
+class SessionBudgetExceeded(Event):
+    """Emitted when a coder agent session exceeds its token budget."""
+
+    event_type: str = "session_budget_exceeded"
+
+
+class PROpened(Event):
+    """Emitted when a coder agent opens a pull request."""
+
+    event_type: str = "pr_opened"
+
+
+class CIResult(Event):
+    """Emitted when CI completes for a pull request (stub or real)."""
+
+    event_type: str = "ci_result"
+
+
+class ReviewComplete(Event):
+    """Emitted when a QA agent completes a PR review."""
+
+    event_type: str = "review_complete"
+
+
 class SystemEvent(Event):
     """Emitted for simulation-level system notifications."""
 

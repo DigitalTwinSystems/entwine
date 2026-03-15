@@ -107,12 +107,19 @@ def validate(
 
 @app.command()
 def ingest(
-    directory: Path = typer.Argument(
+    source: Path = typer.Argument(
         ...,
-        help="Directory containing knowledge base documents (.md, .txt, .rst).",
+        help="Directory containing knowledge base documents (.md, .txt, .rst, .pdf, .docx).",
         exists=True,
         file_okay=False,
         dir_okay=True,
+    ),
+    config: Path = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="Path to simulation config file for RAG settings.",
+        show_default=False,
     ),
     chunk_size: int = typer.Option(
         500,
@@ -126,26 +133,121 @@ def ingest(
         help="Character overlap between consecutive chunks.",
         show_default=True,
     ),
+    default_roles: str = typer.Option(
+        "",
+        "--default-roles",
+        help="Comma-separated default accessible roles for files without metadata.",
+        show_default=False,
+    ),
 ) -> None:
     """Ingest documents from a directory into the Qdrant knowledge store."""
     import asyncio
+    import sys
 
     from entwine.rag.pipeline import ingest_directory
+    from entwine.rag.settings import RAGSettings
     from entwine.rag.store import KnowledgeStore
 
+    roles = [r.strip() for r in default_roles.split(",") if r.strip()] if default_roles else None
+
+    # Build RAGSettings from config file if provided
+    rag_settings: RAGSettings | None = None
+    if config is not None:
+        cfg = load_config(config)
+        if cfg.rag is not None:
+            rag_settings = cfg.rag
+
+    def _progress(path: Path, chunks: int) -> None:
+        if chunks == 0:
+            typer.echo(f"  {path.name}: SKIPPED")
+        else:
+            typer.echo(f"  {path.name}: {chunks} chunks")
+
     async def _run() -> int:
-        store = KnowledgeStore()
+        store = KnowledgeStore(settings=rag_settings)
         await store.init_collection()
         return await ingest_directory(
-            directory,
+            source,
             store,
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
+            default_roles=roles,
+            progress_callback=_progress,
         )
 
-    typer.echo(f"Ingesting documents from {directory} ...")
-    total = asyncio.run(_run())
+    typer.echo(f"Ingesting documents from {source} ...")
+    try:
+        total = asyncio.run(_run())
+    except Exception as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
     typer.echo(f"Done. Ingested {total} document chunks.")
+
+
+@app.command(name="evaluate-rag")
+def evaluate_rag(
+    dataset: Path = typer.Argument(
+        ...,
+        help="Path to evaluation dataset JSON file.",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+    ),
+) -> None:
+    """Evaluate RAG retrieval quality: dense-only vs hybrid (P@5, R@5, MRR)."""
+    import asyncio
+    import json
+
+    from entwine.rag.evaluation import EvalQuery, evaluate
+    from entwine.rag.settings import RAGSettings
+    from entwine.rag.store import KnowledgeStore
+
+    raw = json.loads(dataset.read_text(encoding="utf-8"))
+    queries = [
+        EvalQuery(
+            query=q["query"],
+            relevant_doc_ids=q.get("relevant_doc_stems", q.get("relevant_doc_ids", [])),
+            role=q.get("role", "company-wide"),
+        )
+        for q in raw["queries"]
+    ]
+    typer.echo(f"Loaded {len(queries)} evaluation queries from {dataset}")
+
+    async def _run_eval(hybrid: bool) -> list[list]:  # type: ignore[type-arg]
+        settings = RAGSettings(enable_hybrid=hybrid)
+        store = KnowledgeStore(settings=settings)
+        await store.init_collection()
+        results = []
+        for q in queries:
+            r = await store.search(q.query, agent_roles=[q.role], limit=5)
+            results.append(r)
+        return results
+
+    async def _main() -> None:
+        # Dense-only mode
+        typer.echo("\nRunning dense-only evaluation...")
+        dense_results = await _run_eval(hybrid=False)
+        dense_metrics = evaluate(queries, dense_results, k=5)
+
+        # Hybrid mode
+        typer.echo("Running hybrid (dense + sparse + RRF) evaluation...")
+        hybrid_results = await _run_eval(hybrid=True)
+        hybrid_metrics = evaluate(queries, hybrid_results, k=5)
+
+        typer.echo(f"\n{'Metric':<20} {'Dense-only':>12} {'Hybrid':>12}")
+        typer.echo("-" * 46)
+        typer.echo(
+            f"{'Precision@5':<20} {dense_metrics.precision_at_k:>12.4f}"
+            f" {hybrid_metrics.precision_at_k:>12.4f}"
+        )
+        typer.echo(
+            f"{'Recall@5':<20} {dense_metrics.recall_at_k:>12.4f}"
+            f" {hybrid_metrics.recall_at_k:>12.4f}"
+        )
+        typer.echo(f"{'MRR':<20} {dense_metrics.mrr:>12.4f} {hybrid_metrics.mrr:>12.4f}")
+        typer.echo(f"\nQueries evaluated: {dense_metrics.num_queries}")
+
+    asyncio.run(_main())
 
 
 @app.command()

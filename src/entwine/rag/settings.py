@@ -19,3 +19,4 @@ class RAGSettings(BaseSettings):
     embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536
     enable_hybrid: bool = False
+    rrf_k: int = 60

@@ -4,13 +4,18 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Callable
-from typing import Any, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 import structlog
 
 from entwine.agents.base import BaseAgent
 from entwine.agents.coder_models import CodingTaskResult, CommandResult
 from entwine.agents.models import AgentPersona
+
+if TYPE_CHECKING:
+    from entwine.agents.coder_sdk import CoderSDKSession, CoderSemaphore
+    from entwine.events.bus import EventBus
+    from entwine.platforms.base import PlatformAdapter
 
 log = structlog.get_logger(__name__)
 
@@ -71,6 +76,10 @@ class CoderAgent(BaseAgent):
         *,
         sandbox_provider: SandboxProvider | None = None,
         agent_sdk_factory: AgentSDKFactory | None = None,
+        sdk_session_factory: Callable[..., CoderSDKSession] | None = None,
+        coder_semaphore: CoderSemaphore | None = None,
+        platform_adapter: PlatformAdapter | None = None,
+        typed_bus: EventBus | None = None,
         repo_url: str = "",
         max_tokens_per_session: int = 100_000,
         tick_interval: float = 0.05,
@@ -78,6 +87,10 @@ class CoderAgent(BaseAgent):
         super().__init__(persona, event_bus, tick_interval=tick_interval)
         self._sandbox_provider = sandbox_provider
         self._agent_sdk_factory = agent_sdk_factory
+        self._sdk_session_factory = sdk_session_factory
+        self._coder_semaphore = coder_semaphore
+        self._platform_adapter = platform_adapter
+        self._typed_bus = typed_bus
         self._repo_url = repo_url
         self._max_tokens_per_session = max_tokens_per_session
         self._session_tokens_used: int = 0
@@ -107,7 +120,16 @@ class CoderAgent(BaseAgent):
     # ------------------------------------------------------------------
 
     async def _call_llm(self, event: Any, rag_results: list[Any]) -> Any:
-        """Query the agent SDK if available; otherwise return None."""
+        """Query the agent SDK if available; otherwise return None.
+
+        Prefers CoderSDKSession (new) over raw AgentSDKFactory (legacy).
+        Respects CoderSemaphore for concurrency limiting.
+        """
+        # Try new SDK session factory first
+        if self._sdk_session_factory is not None:
+            return await self._call_llm_sdk_session(event, rag_results)
+
+        # Fall back to legacy AgentSDKFactory protocol
         if self._agent_sdk_factory is None:
             return None
 
@@ -144,6 +166,41 @@ class CoderAgent(BaseAgent):
             return None
 
         return "".join(collected_content) if collected_content else None
+
+    async def _call_llm_sdk_session(self, event: Any, rag_results: list[Any]) -> Any:
+        """Execute coding task via CoderSDKSession with optional concurrency limiting."""
+        # Pre-check token budget
+        if self._session_tokens_used >= self._max_tokens_per_session:
+            log.warning(
+                "coder_agent.token_budget_exceeded",
+                agent=self.name,
+                used=self._session_tokens_used,
+                max=self._max_tokens_per_session,
+            )
+            return None
+
+        prompt = self._build_prompt(event, rag_results)
+
+        if self._coder_semaphore is not None:
+            log.info("coder_agent.waiting_for_slot", agent=self.name)
+            await self._coder_semaphore.acquire()
+
+        try:
+            session = self._sdk_session_factory()  # type: ignore[misc]
+            result = await session.run(prompt)
+            self._session_tokens_used += session.total_input_tokens + session.total_output_tokens
+
+            if result.success:
+                # Return the CodingTaskResult — not the prompt text
+                return result
+            log.warning("coder_agent.sdk_session_failed", agent=self.name, error=result.error)
+            return None
+        except Exception as exc:
+            log.error("coder_agent.sdk_session_error", agent=self.name, error=str(exc))
+            return None
+        finally:
+            if self._coder_semaphore is not None:
+                self._coder_semaphore.release()
 
     async def _emit_events(self, llm_response: Any, tool_results: list[Any]) -> None:
         """Emit an agent_message event if the LLM produced content."""
@@ -200,9 +257,11 @@ class CoderAgent(BaseAgent):
 
         Steps:
         1. Extract task description from the event payload.
-        2. Query the SDK for a coding plan.
-        3. Execute commands in the sandbox (if available).
-        4. Return the coding task result.
+        2. Query the SDK for a coding plan / execution.
+        3. For SDK session path: result contains files_changed directly.
+        4. For legacy path: execute in sandbox if available.
+        5. Open PR via platform adapter if configured.
+        6. Return the coding task result.
         """
         payload = event if isinstance(event, dict) else {}
         task_description = payload.get("payload", {}).get(
@@ -222,8 +281,13 @@ class CoderAgent(BaseAgent):
         pr_url: str | None = None
         error: str | None = None
 
-        if llm_response:
-            # Execute in sandbox if available.
+        if isinstance(llm_response, CodingTaskResult):
+            # SDK session path — result is a CodingTaskResult with files_changed
+            files_changed = llm_response.files_changed
+            if not llm_response.success:
+                error = llm_response.error
+        elif llm_response:
+            # Legacy path — execute in sandbox if available
             if self.has_sandbox:
                 sandbox_output = await self._execute_in_sandbox(llm_response)
                 if sandbox_output.startswith("[error]"):
@@ -232,6 +296,10 @@ class CoderAgent(BaseAgent):
                     files_changed = _extract_files(sandbox_output)
         else:
             error = "No LLM response received."
+
+        # Open PR via platform adapter if coding succeeded
+        if error is None and self._platform_adapter is not None and self._typed_bus is not None:
+            pr_url = await self._open_pr(task_description)
 
         result = CodingTaskResult(
             task_description=task_description,
@@ -258,6 +326,25 @@ class CoderAgent(BaseAgent):
         )
 
         return result
+
+    async def _open_pr(self, task_description: str) -> str | None:
+        """Open a PR and run the PR workflow. Returns pr_url or None."""
+        try:
+            from entwine.agents.pr_workflow import run_pr_workflow
+
+            branch = f"agent/{self.name}"
+            pr_result = await run_pr_workflow(
+                self._platform_adapter,  # type: ignore[arg-type]
+                self._typed_bus,  # type: ignore[arg-type]
+                source_agent=self.name,
+                branch=branch,
+                title=task_description[:70],
+                body=task_description,
+            )
+            return pr_result.get("pr_url", "")
+        except Exception as exc:
+            log.warning("coder_agent.pr_workflow_error", agent=self.name, error=str(exc))
+            return None
 
     # ------------------------------------------------------------------
     # Cleanup

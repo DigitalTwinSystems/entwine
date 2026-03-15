@@ -25,7 +25,6 @@ from entwine.rag.settings import RAGSettings
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
-_RRF_K = 60
 _SPARSE_VECTOR_NAME = "text_sparse"
 _TOKEN_PATTERN = re.compile(r"[a-z0-9]+")
 
@@ -76,6 +75,22 @@ class KnowledgeStore:
             hybrid=self._settings.enable_hybrid,
         )
 
+    async def get_existing_ids(self, ids: list[str]) -> set[str]:
+        """Return the subset of *ids* that already exist in the collection."""
+        if not ids:
+            return set()
+        try:
+            points = await self._client.retrieve(
+                collection_name=self._settings.collection_name,
+                ids=ids,
+                with_payload=False,
+                with_vectors=False,
+            )
+            return {str(p.id) for p in points}
+        except Exception:
+            logger.warning("store.get_existing_ids_failed", exc_info=True)
+            return set()
+
     async def upsert(self, documents: list[Document]) -> None:
         """Embed *documents* and upsert them into the collection.
 
@@ -121,23 +136,39 @@ class KnowledgeStore:
     async def search(
         self,
         query: str,
-        agent_role: str,
+        agent_roles: list[str] | str | None = None,
+        *,
+        agent_role: str | None = None,
         limit: int = 5,
     ) -> list[SearchResult]:
-        """Search the collection for documents accessible by *agent_role*.
+        """Search the collection for documents accessible by the agent's roles.
 
         Args:
             query: Natural-language query string.
-            agent_role: The role of the requesting agent; only documents whose
-                ``accessible_roles`` metadata list contains this value are returned.
+            agent_roles: List of roles the agent has access to. Documents whose
+                ``accessible_roles`` metadata list contains any of these values
+                (or ``"company-wide"``) are returned.
+            agent_role: Deprecated single-role string. Kept for backward compat.
             limit: Maximum number of results to return.
 
         Returns:
             Ranked list of :class:`SearchResult` objects (highest score first).
         """
+        # Normalize roles: accept list, single string, or legacy kwarg
+        roles: list[str]
+        if agent_roles is not None:
+            roles = [agent_roles] if isinstance(agent_roles, str) else list(agent_roles)
+        elif agent_role is not None:
+            roles = [agent_role]
+        else:
+            roles = []
+
+        # Always include "company-wide" so company-wide docs are accessible to all
+        all_match_roles = list({*roles, "company-wide"})
+
         log = logger.bind(
             collection=self._settings.collection_name,
-            agent_role=agent_role,
+            agent_roles=all_match_roles,
             limit=limit,
         )
         log.debug("store.search_start")
@@ -149,7 +180,7 @@ class KnowledgeStore:
             must=[
                 FieldCondition(
                     key="accessible_roles",
-                    match=MatchAny(any=[agent_role]),
+                    match=MatchAny(any=all_match_roles),
                 )
             ]
         )
@@ -181,7 +212,7 @@ class KnowledgeStore:
         )
         sparse_results = self._hits_to_results(sparse_response.points)
 
-        fused = self._rrf_fuse(dense_results, sparse_results, limit=limit)
+        fused = self._rrf_fuse(dense_results, sparse_results, limit=limit, k=self._settings.rrf_k)
         log.info("store.search_complete", num_results=len(fused), hybrid=True)
         return fused
 
@@ -229,12 +260,13 @@ class KnowledgeStore:
         sparse_results: list[SearchResult],
         *,
         limit: int = 5,
+        k: int = 60,
     ) -> list[SearchResult]:
         """Fuse two ranked lists using Reciprocal Rank Fusion (RRF).
 
         For each document, the fused score is:
             ``score = sum(1 / (k + rank_i))``
-        where *k* = 60 (the standard RRF constant) and *rank_i* is the
+        where *k* defaults to 60 (the standard RRF constant) and *rank_i* is the
         1-based rank in each result list the document appears in.
         """
         doc_map: dict[str, SearchResult] = {}
@@ -242,13 +274,13 @@ class KnowledgeStore:
 
         for rank, result in enumerate(dense_results, start=1):
             doc_id = result.document.id
-            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (_RRF_K + rank)
+            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank)
             if doc_id not in doc_map:
                 doc_map[doc_id] = result
 
         for rank, result in enumerate(sparse_results, start=1):
             doc_id = result.document.id
-            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (_RRF_K + rank)
+            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (k + rank)
             if doc_id not in doc_map:
                 doc_map[doc_id] = result
 

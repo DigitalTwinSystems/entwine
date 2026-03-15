@@ -1,0 +1,78 @@
+# generated: 2026-03-14
+# last_updated: 2026-03-15
+# project: entwine
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-03-14
+last_updated: 2026-03-15
+project: entwine
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # ── Epic 1: Knowledge-Powered Agents ──
+  epic-1: done
+  1-1-document-ingestion-pipeline: done
+  1-2-sample-company-knowledge-base: done
+  1-3-role-based-knowledge-access: done
+  1-4-hybrid-search-tuning-evaluation: done
+  epic-1-retrospective: optional
+
+  # ── Epic 2: Coder Agent Subsystem ──
+  epic-2: done
+  2-1-e2b-sandbox-integration: done
+  2-2-claude-agent-sdk-coder-loop: done
+  2-3-coder-agent-tools: done
+  2-4-github-pr-workflow: done
+  2-5-qa-agent-pr-review: done
+  epic-2-retrospective: optional
+
+  # ── Epic 3: Financial Simulation ──
+  epic-3: backlog
+  3-1-economics-data-models-adr: backlog
+  3-2-ledger-chart-of-accounts: backlog
+  3-3-spending-approval-hierarchy: backlog
+  3-4-paypal-platform-integration: backlog
+  3-5-agent-economics-tools: backlog
+  3-6-economics-api-engine-integration: backlog
+  epic-3-retrospective: optional
+
+  # ── Epic 4: Live Deployment & Operations ──
+  epic-4: backlog
+  4-1-provision-deployment-vm: backlog
+  4-2-real-platform-integration-verification: backlog
+  4-3-monitoring-alerting: backlog
+  4-4-first-live-simulation-run-report: backlog
+  epic-4-retrospective: optional

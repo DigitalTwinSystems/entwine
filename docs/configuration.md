@@ -106,9 +106,27 @@ agents:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `ENTWINE_QDRANT_URL` | `http://localhost:6333` | Qdrant server URL |
+| `RAG_QDRANT_URL` | `http://localhost:6333` | Qdrant server URL |
 | `RAG_COLLECTION_NAME` | `enterprise_knowledge` | Qdrant collection name |
 | `RAG_EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model |
+| `RAG_EMBEDDING_DIMENSIONS` | `1536` | Embedding vector dimensions |
+| `RAG_ENABLE_HYBRID` | `false` | Enable hybrid search (dense + sparse + RRF) |
+| `RAG_RRF_K` | `60` | RRF fusion constant (higher = more weight to lower-ranked results) |
+
+### RAG tuning
+
+**Hybrid search** combines dense vector search (semantic similarity via `text-embedding-3-small`) with sparse vector search (BM25-style term matching) using Reciprocal Rank Fusion (RRF).
+
+**Recommended settings:**
+
+| Setting | Value | Rationale |
+|---------|-------|-----------|
+| `RAG_ENABLE_HYBRID` | `true` | Hybrid retrieval improves recall for keyword-heavy queries |
+| `RAG_RRF_K` | `60` | Standard RRF constant; lower values (e.g. 20) favour top-ranked results more aggressively |
+| Chunk size | `500` chars | Balances context completeness with retrieval precision |
+| Chunk overlap | `100` chars | Prevents information loss at chunk boundaries |
+
+**Evaluation:** Run `entwine evaluate-rag --dataset examples/evaluation/rag_eval_dataset.json` to compare dense-only vs hybrid retrieval quality (P@5, R@5, MRR) on a 20-query evaluation dataset.
 
 ### Platform credentials
 

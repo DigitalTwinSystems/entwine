@@ -324,6 +324,42 @@ class TestKnowledgeStoreSearch:
         assert len(upsert_kwargs["points"]) == 2
 
     @pytest.mark.asyncio
+    async def test_get_existing_ids_returns_found(
+        self,
+        mock_qdrant_client: MagicMock,
+        mock_embedding_service: MagicMock,
+        rag_settings: RAGSettings,
+    ) -> None:
+        point_a = MagicMock()
+        point_a.id = "doc-a"
+        mock_qdrant_client.retrieve = AsyncMock(return_value=[point_a])
+
+        store = KnowledgeStore(
+            client=mock_qdrant_client,
+            embedding_service=mock_embedding_service,
+            settings=rag_settings,
+        )
+        result = await store.get_existing_ids(["doc-a", "doc-b"])
+
+        assert result == {"doc-a"}
+        mock_qdrant_client.retrieve.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_get_existing_ids_empty_input(
+        self,
+        mock_qdrant_client: MagicMock,
+        mock_embedding_service: MagicMock,
+        rag_settings: RAGSettings,
+    ) -> None:
+        store = KnowledgeStore(
+            client=mock_qdrant_client,
+            embedding_service=mock_embedding_service,
+            settings=rag_settings,
+        )
+        result = await store.get_existing_ids([])
+        assert result == set()
+
+    @pytest.mark.asyncio
     async def test_upsert_empty_list_is_noop(
         self,
         mock_qdrant_client: MagicMock,
@@ -416,6 +452,15 @@ class TestRRFFuse:
         fused = KnowledgeStore._rrf_fuse(dense, sparse, limit=2)
         assert len(fused) == 2
 
+    def test_fuse_custom_k(self) -> None:
+        doc_a = Document(id="a", content="A")
+        dense = [SearchResult(document=doc_a, score=0.9)]
+        sparse: list[SearchResult] = []
+
+        fused = KnowledgeStore._rrf_fuse(dense, sparse, limit=5, k=20)
+        # score = 1 / (20 + 1) = 1/21
+        assert fused[0].score == pytest.approx(1.0 / 21)
+
     def test_fuse_rrf_scores_are_correct(self) -> None:
         doc_a = Document(id="a", content="A")
         doc_b = Document(id="b", content="B")
@@ -428,6 +473,96 @@ class TestRRFFuse:
         expected_score = 1.0 / (60 + 1)
         for result in fused:
             assert result.score == pytest.approx(expected_score)
+
+
+class TestRoleBasedAccess:
+    @pytest.mark.asyncio
+    async def test_search_with_multiple_roles(
+        self,
+        mock_qdrant_client: MagicMock,
+        mock_embedding_service: MagicMock,
+        rag_settings: RAGSettings,
+    ) -> None:
+        mock_qdrant_client.search.return_value = []
+
+        store = KnowledgeStore(
+            client=mock_qdrant_client,
+            embedding_service=mock_embedding_service,
+            settings=rag_settings,
+        )
+        await store.search("query", agent_roles=["engineering", "devops"], limit=5)
+
+        call_kwargs = mock_qdrant_client.search.call_args.kwargs
+        filter_obj = call_kwargs["query_filter"]
+        # Filter should include engineering, devops, and company-wide
+        match_condition = filter_obj.must[0]
+        assert "company-wide" in match_condition.match.any
+        assert "engineering" in match_condition.match.any
+        assert "devops" in match_condition.match.any
+
+    @pytest.mark.asyncio
+    async def test_company_wide_always_included(
+        self,
+        mock_qdrant_client: MagicMock,
+        mock_embedding_service: MagicMock,
+        rag_settings: RAGSettings,
+    ) -> None:
+        mock_qdrant_client.search.return_value = []
+
+        store = KnowledgeStore(
+            client=mock_qdrant_client,
+            embedding_service=mock_embedding_service,
+            settings=rag_settings,
+        )
+        await store.search("query", agent_roles=["marketing"], limit=5)
+
+        call_kwargs = mock_qdrant_client.search.call_args.kwargs
+        match_condition = call_kwargs["query_filter"].must[0]
+        assert "company-wide" in match_condition.match.any
+        assert "marketing" in match_condition.match.any
+
+    @pytest.mark.asyncio
+    async def test_backward_compat_agent_role_string(
+        self,
+        mock_qdrant_client: MagicMock,
+        mock_embedding_service: MagicMock,
+        rag_settings: RAGSettings,
+    ) -> None:
+        mock_qdrant_client.search.return_value = []
+
+        store = KnowledgeStore(
+            client=mock_qdrant_client,
+            embedding_service=mock_embedding_service,
+            settings=rag_settings,
+        )
+        await store.search("query", agent_role="cto", limit=5)
+
+        call_kwargs = mock_qdrant_client.search.call_args.kwargs
+        match_condition = call_kwargs["query_filter"].must[0]
+        assert "cto" in match_condition.match.any
+        assert "company-wide" in match_condition.match.any
+
+    @pytest.mark.asyncio
+    async def test_agent_roles_string_auto_wraps(
+        self,
+        mock_qdrant_client: MagicMock,
+        mock_embedding_service: MagicMock,
+        rag_settings: RAGSettings,
+    ) -> None:
+        """Passing a single string to agent_roles wraps it in a list."""
+        mock_qdrant_client.search.return_value = []
+
+        store = KnowledgeStore(
+            client=mock_qdrant_client,
+            embedding_service=mock_embedding_service,
+            settings=rag_settings,
+        )
+        await store.search("query", agent_roles="developer", limit=5)
+
+        call_kwargs = mock_qdrant_client.search.call_args.kwargs
+        match_condition = call_kwargs["query_filter"].must[0]
+        assert "developer" in match_condition.match.any
+        assert "company-wide" in match_condition.match.any
 
 
 class TestHybridSearch:

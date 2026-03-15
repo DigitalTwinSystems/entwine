@@ -1,0 +1,105 @@
+{
+  "description": "RAG evaluation dataset for Acme Corp knowledge base. 20 queries with expected relevant documents.",
+  "queries": [
+    {
+      "query": "What are the company values?",
+      "relevant_doc_stems": ["company-handbook"],
+      "role": "company-wide"
+    },
+    {
+      "query": "What is the PTO policy?",
+      "relevant_doc_stems": ["company-handbook"],
+      "role": "company-wide"
+    },
+    {
+      "query": "What tech stack does the engineering team use?",
+      "relevant_doc_stems": ["engineering-standards"],
+      "role": "developer"
+    },
+    {
+      "query": "How does the code review process work?",
+      "relevant_doc_stems": ["engineering-standards"],
+      "role": "developer"
+    },
+    {
+      "query": "What is the deployment process?",
+      "relevant_doc_stems": ["engineering-standards"],
+      "role": "devops"
+    },
+    {
+      "query": "What is the Q2 marketing strategy?",
+      "relevant_doc_stems": ["marketing-playbook"],
+      "role": "head of marketing"
+    },
+    {
+      "query": "What content is planned for April?",
+      "relevant_doc_stems": ["marketing-playbook"],
+      "role": "marketing specialist"
+    },
+    {
+      "query": "What are the marketing KPIs?",
+      "relevant_doc_stems": ["marketing-playbook"],
+      "role": "ceo"
+    },
+    {
+      "query": "What is the ideal customer profile for sales?",
+      "relevant_doc_stems": ["sales-process"],
+      "role": "sales representative"
+    },
+    {
+      "query": "What are the pricing tiers?",
+      "relevant_doc_stems": ["sales-process"],
+      "role": "sales representative"
+    },
+    {
+      "query": "How do we handle competitor objections?",
+      "relevant_doc_stems": ["sales-process"],
+      "role": "sales representative"
+    },
+    {
+      "query": "How should P0 critical tickets be triaged?",
+      "relevant_doc_stems": ["support-runbook"],
+      "role": "customer support engineer"
+    },
+    {
+      "query": "What is the escalation path for customer issues?",
+      "relevant_doc_stems": ["support-runbook"],
+      "role": "customer support engineer"
+    },
+    {
+      "query": "How to debug authentication failures?",
+      "relevant_doc_stems": ["support-runbook"],
+      "role": "developer"
+    },
+    {
+      "query": "What are the P0 product roadmap items?",
+      "relevant_doc_stems": ["product-roadmap"],
+      "role": "cto"
+    },
+    {
+      "query": "When is API v2 launching?",
+      "relevant_doc_stems": ["product-roadmap"],
+      "role": "product manager"
+    },
+    {
+      "query": "What should I do on my first day?",
+      "relevant_doc_stems": ["onboarding-guide"],
+      "role": "company-wide"
+    },
+    {
+      "query": "How do I set up my development environment?",
+      "relevant_doc_stems": ["onboarding-guide", "engineering-standards"],
+      "role": "developer"
+    },
+    {
+      "query": "Who is the CTO and how do I contact them?",
+      "relevant_doc_stems": ["onboarding-guide", "company-handbook"],
+      "role": "company-wide"
+    },
+    {
+      "query": "What is the on-call rotation process?",
+      "relevant_doc_stems": ["engineering-standards"],
+      "role": "developer"
+    }
+  ]
+}

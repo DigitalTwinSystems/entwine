@@ -25,14 +25,17 @@ async def delegate_task(recipient: str, task_description: str, priority: str = "
 async def query_knowledge(query: str, role: str) -> str:
     """Query the knowledge base for information relevant to a role.
 
+    *role* is a comma-separated list of roles or a single role string.
     Uses the real KnowledgeStore when available, falls back to a stub response.
     """
     if _knowledge_store is not None:
         try:
-            results = await _knowledge_store.search(query=query, agent_role=role, limit=5)
+            # Support comma-separated roles or a single role
+            roles = [r.strip() for r in role.split(",") if r.strip()]
+            results = await _knowledge_store.search(query=query, agent_roles=roles, limit=5)
             if results:
                 snippets = [
-                    f"[{r.document.metadata.get('source_file', 'unknown')}] "
+                    f"[{r.document.metadata.get('source_path', 'unknown')}] "
                     f"{r.document.content[:200]}"
                     for r in results
                 ]
